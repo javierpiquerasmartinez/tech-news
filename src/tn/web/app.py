@@ -238,7 +238,7 @@ def pagina_propuestas(request: Request, semana: str | None = None):
     lista = propuestas.listar(inicio)
     with conexion() as conn:
         cabecera = _cabecera(conn)
-    semanas = sorted({p.parent.name for p in (config.raiz() / "semanas").glob("*/")} | {inicio.isoformat()}, reverse=True)
+    semanas = sorted({p.name for p in (config.raiz() / "semanas").glob("*/") if p.is_dir()} | {inicio.isoformat()}, reverse=True)
     tarjetas = [{"p": p, "html": _html(p.cuerpo),
                  "siguientes": propuestas.TRANSICIONES[p.estado]} for p in lista]
     return plantillas.TemplateResponse(
