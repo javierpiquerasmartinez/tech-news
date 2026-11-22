@@ -54,6 +54,11 @@ HERRAMIENTAS = {
         "Read(estilo-edicion.md)",
         "Edit(./data/borradores/**)",
     ],
+    "estilo": [
+        "Bash(uv run tn estilo notas:*)",
+        "Read(estilo-edicion.md)",
+        "Edit(./data/borradores/**)",
+    ],
     "perfil": [
         "Bash(uv run tn perfil decisiones:*)",
         "Read(perfil-editorial.md)",

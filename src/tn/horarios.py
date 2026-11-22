@@ -25,7 +25,7 @@ TAREAS: dict[str, dict] = {
                     "que": "Post de LinkedIn de lo último (48 h) → Telegram"},
     "resumen": {"cuando": {"Weekday": 4, "Hour": 22, "Minute": 0}, "que": "Resumen semanal + ideas de Vídeo didáctico"},
     "aviso-paquete": {"cuando": {"Weekday": 5, "Hour": 8, "Minute": 0}, "que": "Aviso: paquete semanal listo"},
-    "perfil": {"cuando": {"Weekday": 0, "Hour": 22, "Minute": 45}, "que": "Propuesta de cambios al Perfil editorial"},
+    "perfil": {"cuando": {"Weekday": 0, "Hour": 22, "Minute": 45}, "que": "Propuestas de cambios al Perfil editorial y a la Guía de estilo"},
 }
 DIAS = {0: "domingo", 1: "lunes", 2: "martes", 3: "miércoles", 4: "jueves", 5: "viernes", 6: "sábado"}
 

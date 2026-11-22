@@ -250,9 +250,29 @@ def contexto_graficos(m: "Montaje") -> dict:
 
     if not m.corte.is_file():
         raise MontajeInvalido("Aún no hay Corte: primero `tn montar --hasta cortar`")
+    from tn import feedback
+
     corte_ = json.loads(m.corte.read_text())
     trans = json.loads((m.carpeta / "transcripcion-corte.json").read_text())
-    return graficos.contexto_agente(corte_, trans, m.guion())
+    ctx = graficos.contexto_agente(corte_, trans, m.guion())
+    # La Ficha de feedback y el plan anterior: la siguiente versión corrige sobre lo que había.
+    ctx["feedback"] = [n.como_dict() for n in feedback.leer(m.semana)]
+    ctx["plan_anterior"] = json.loads(m.plan_graficos.read_text()) if m.plan_graficos.is_file() else []
+    return ctx
+
+
+def version_actual(m: "Montaje") -> str:
+    """`v2` si el último ensamblado fue «JP Dev … v2»; `—` si aún no hay."""
+    proyecto = m.estado()["pasos"].get("ensamblar", {}).get("proyecto", "")
+    return proyecto.rsplit(" ", 1)[-1] if proyecto.rsplit(" ", 1)[-1].startswith("v") else "—"
+
+
+def feedback_sin_aplicar(m: "Montaje") -> bool:
+    """Hay notas posteriores al último plan de Gráficos: la siguiente versión debe tenerlas en cuenta."""
+    from tn import feedback
+
+    r = feedback.ruta(m.semana)
+    return r.is_file() and (not m.plan_graficos.is_file() or r.stat().st_mtime > m.plan_graficos.stat().st_mtime)
 
 
 def guardar_plan_graficos(m: "Montaje", plan: list[dict]) -> list[str]:
@@ -272,7 +292,7 @@ def guardar_plan_graficos(m: "Montaje", plan: list[dict]) -> list[str]:
 def hacer_graficos(m: "Montaje", con_agente: bool = True, origen: str = "manual", al_avanzar=None) -> dict:
     from tn import agentes, capcut, config, db, graficos
 
-    if con_agente and not m.plan_graficos.is_file():
+    if con_agente and (not m.plan_graficos.is_file() or feedback_sin_aplicar(m)):
         if al_avanzar:
             al_avanzar("graficos: el agente decide rótulos, infografías y capturas")
         conn = db.conectar(config.ruta_db())
