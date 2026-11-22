@@ -134,7 +134,8 @@ def _historia_para_redactor(conn: sqlite3.Connection, hid: int) -> dict:
 
 
 def contexto(conn: sqlite3.Connection, formato: str, *, semana: date | None = None,
-             historia_id: int | None = None, momento: datetime | None = None) -> dict:
+             historia_id: int | None = None, momento: datetime | None = None,
+             horas: int | None = None) -> dict:
     """Historias candidatas y Propuestas ya escritas para que el Redactor elija y no repita."""
     if formato not in FORMATOS:
         raise PropuestaInvalida(f"Formato desconocido: {formato}. Usa uno de {', '.join(FORMATOS)}")
@@ -157,8 +158,16 @@ def contexto(conn: sqlite3.Connection, formato: str, *, semana: date | None = No
         # reescriben enteros, así que no deben excluir lo que ya usaba la versión anterior.
         usadas_en_formato = ({h for p in ya if p["formato"] == formato for h in p["historias"]}
                              if formato == "linkedin" else set())
-        filas = historias.listar(conn, desde=desde, estados=("nueva", "destacada", "usada"), orden=orden, limite=limite * 2)
-        candidatas = [_historia_para_redactor(conn, f["id"]) for f in filas if f["id"] not in usadas_en_formato][:limite]
+        if horas:
+            # Post diario: solo lo reciente. Si hay muy poco (fin de semana), se amplía una vez.
+            desde = momento - timedelta(hours=horas)
+        def elegir(desde_):
+            filas = historias.listar(conn, desde=desde_, estados=("nueva", "destacada", "usada"), orden=orden, limite=limite * 2)
+            return [f["id"] for f in filas if f["id"] not in usadas_en_formato][:limite]
+        ids = elegir(desde)
+        if horas and len(ids) < 3:
+            ids = elegir(momento - timedelta(hours=horas * 2))
+        candidatas = [_historia_para_redactor(conn, i) for i in ids]
 
     return {
         "formato": formato,

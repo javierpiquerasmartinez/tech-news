@@ -17,7 +17,7 @@
 </div>
 
 <div class="filtros barra-redactor">
-  {% for f, etiqueta in [('resumen', 'Escribir Resumen semanal'), ('linkedin', 'Escribir 3 posts de LinkedIn'), ('didactico', 'Proponer 3 ideas didácticas')] %}
+  {% for f, etiqueta in [('resumen', 'Escribir Resumen semanal'), ('post', 'Escribir post de hoy'), ('didactico', 'Proponer 3 ideas didácticas')] %}
     <form method="post" action="/lanzar-redactor">
       <input type="hidden" name="formato" value="{{ f }}">
       <button class="boton" {% if en_curso %}disabled{% endif %}>{{ etiqueta }}</button>

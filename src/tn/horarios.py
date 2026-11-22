@@ -21,16 +21,19 @@ CARPETA = Path.home() / "Library" / "LaunchAgents"
 # launchd: Weekday 0 = domingo, 1 = lunes … 4 = jueves, 5 = viernes.
 TAREAS: dict[str, dict] = {
     "diario": {"cuando": {"Hour": 16, "Minute": 0}, "que": "Recoger → editar → explorar → bomba → copia de seguridad"},
+    "post-diario": {"cuando": [{"Weekday": d, "Hour": 16, "Minute": 30} for d in (1, 2, 3)],
+                    "que": "Post de LinkedIn de lo último (48 h) → Telegram"},
     "resumen": {"cuando": {"Weekday": 4, "Hour": 22, "Minute": 0}, "que": "Resumen semanal + ideas de Vídeo didáctico"},
-    "linkedin": {"cuando": {"Weekday": 0, "Hour": 22, "Minute": 0}, "que": "3 Posts de LinkedIn"},
-    "perfil": {"cuando": {"Weekday": 0, "Hour": 22, "Minute": 45}, "que": "Propuesta de cambios al Perfil editorial"},
     "aviso-paquete": {"cuando": {"Weekday": 5, "Hour": 8, "Minute": 0}, "que": "Aviso: paquete semanal listo"},
-    "aviso-posts": {"cuando": {"Weekday": 1, "Hour": 8, "Minute": 0}, "que": "Aviso: posts de LinkedIn listos"},
+    "perfil": {"cuando": {"Weekday": 0, "Hour": 22, "Minute": 45}, "que": "Propuesta de cambios al Perfil editorial"},
 }
 DIAS = {0: "domingo", 1: "lunes", 2: "martes", 3: "miércoles", 4: "jueves", 5: "viernes", 6: "sábado"}
 
 
-def cuando_legible(c: dict) -> str:
+def cuando_legible(c: dict | list[dict]) -> str:
+    if isinstance(c, list):
+        hora = f"{c[0]['Hour']:02d}:{c[0].get('Minute', 0):02d}"
+        return f"{'/'.join(DIAS[x['Weekday']][:3] for x in c)} {hora}"
     hora = f"{c['Hour']:02d}:{c.get('Minute', 0):02d}"
     return f"{DIAS[c['Weekday']]} {hora}" if "Weekday" in c else f"a diario {hora}"
 
@@ -76,9 +79,22 @@ def _dominio() -> str:
     return f"gui/{os.getuid()}"
 
 
+def _limpiar_antiguas() -> list[str]:
+    """Quita tareas de versiones anteriores que ya no están en TAREAS."""
+    quitadas = []
+    for ruta in CARPETA.glob(f"{PREFIJO}.*.plist"):
+        tarea = ruta.stem.removeprefix(f"{PREFIJO}.")
+        if tarea not in TAREAS:
+            _launchctl("bootout", f"{_dominio()}/{ruta.stem}")
+            ruta.unlink()
+            quitadas.append(tarea)
+    return quitadas
+
+
 def instalar() -> list[str]:
     CARPETA.mkdir(parents=True, exist_ok=True)
     (config.ruta_db().parent / "registros").mkdir(parents=True, exist_ok=True)
+    _limpiar_antiguas()
     hechas = []
     for tarea in TAREAS:
         ruta = ruta_plist(tarea)
@@ -93,7 +109,7 @@ def instalar() -> list[str]:
 
 
 def desinstalar() -> list[str]:
-    quitadas = []
+    quitadas = _limpiar_antiguas()
     for tarea in TAREAS:
         ruta = ruta_plist(tarea)
         _launchctl("bootout", f"{_dominio()}/{etiqueta(tarea)}")
