@@ -1,0 +1,104 @@
+{% set puntos = [('U', 'urgencia', 'Urgencia', h.just_urgencia), ('D', 'valor_didactico', 'Valor didáctico', h.just_didactico), ('S', 'peso_semanal', 'Peso semanal', h.just_peso)] %}
+<article class="historia estado-{{ h.estado }}{% if h.es_bomba %} es-bomba{% endif %}" id="h-{{ h.id }}">
+  <div class="historia-principal">
+    <div class="historia-meta">
+      <span class="id">#{{ h.id }}</span>
+      {% if h.es_bomba %}<span class="chip bomba">Historia bomba</span>{% endif %}
+      {% if h.estado == 'destacada' %}<span class="chip destacada">★ Destacada</span>{% endif %}
+      {% if h.estado == 'descartada' %}<span class="chip descartada">Descartada{% if h.motivo_descarte %} · {{ h.motivo_descarte }}{% endif %}</span>{% endif %}
+      {% if h.estado == 'usada' %}<span class="chip usada">Usada</span>{% endif %}
+      <span class="chip area">{{ h.area or 'otros' }}</span>
+      <span class="tenue">{{ items|length }} items · {{ n_fuentes }} fuentes · {{ h.ultimo_item_en|dia }}</span>
+    </div>
+    <h2 class="historia-titulo">{{ h.titulo }}</h2>
+    {% if h.resumen %}<p class="historia-resumen">{{ h.resumen }}</p>{% endif %}
+    {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+  </div>
+
+  <div class="puntos" aria-label="Puntuaciones">
+    {% for letra, campo, nombre, just in puntos %}
+      <div class="punto nivel-{{ h[campo]|nivel }}" title="{{ nombre }}: {{ just }}">
+        <span class="punto-letra">{{ letra }}</span>
+        <span class="punto-valor">{{ h[campo] }}</span>
+        <span class="punto-barra"><span style="width: {{ h[campo] * 10 }}%"></span></span>
+      </div>
+    {% endfor %}
+  </div>
+
+  <div class="acciones">
+    {% if h.estado == 'nueva' %}
+      <button class="boton" hx-post="/historia/{{ h.id }}/destacar" hx-target="#h-{{ h.id }}" hx-swap="outerHTML">★ Destacar</button>
+    {% endif %}
+    {% if h.estado in ('nueva', 'destacada') %}
+      <details class="menu">
+        <summary class="boton">Descartar</summary>
+        <div class="menu-panel">
+          {% for m in motivos %}
+            <button class="opcion" hx-post="/historia/{{ h.id }}/descartar" hx-vals='{"motivo": "{{ m }}"}' hx-target="#h-{{ h.id }}" hx-swap="outerHTML">{{ m }}</button>
+          {% endfor %}
+          <form hx-post="/historia/{{ h.id }}/descartar" hx-target="#h-{{ h.id }}" hx-swap="outerHTML" class="en-linea">
+            <input name="motivo" placeholder="Otro motivo…" aria-label="Otro motivo">
+            <button class="boton">Descartar</button>
+          </form>
+        </div>
+      </details>
+    {% endif %}
+    {% if h.estado in ('descartada', 'destacada') %}
+      <button class="boton" hx-post="/historia/{{ h.id }}/restaurar" hx-target="#h-{{ h.id }}" hx-swap="outerHTML">Restaurar</button>
+    {% endif %}
+  </div>
+
+  <details class="detalle">
+    <summary>Por qué estas puntuaciones · Items · corregir</summary>
+    <div class="detalle-cuerpo">
+      <dl class="justificaciones">
+        {% for letra, campo, nombre, just in puntos %}
+          <dt>{{ nombre }} <b>{{ h[campo] }}</b></dt><dd>{{ just }}</dd>
+        {% endfor %}
+      </dl>
+
+      <form class="items" hx-post="/historia/{{ h.id }}/separar" hx-target="#h-{{ h.id }}" hx-swap="outerHTML">
+        <h3>Items</h3>
+        <ul>
+          {% for i in items %}
+            <li>
+              {% if items|length > 1 %}<input type="checkbox" name="items" value="{{ i.id }}" id="it-{{ h.id }}-{{ i.id }}" aria-label="Seleccionar para separar">{% endif %}
+              <div>
+                <a href="{{ i.url }}" target="_blank" rel="noopener">{{ i.titulo }}</a>
+                <span class="tenue">{{ i.fuente_id }}{% if i.seccion %} · {{ i.seccion }}{% endif %} · {{ i.publicado_en|dia }}</span>
+              </div>
+            </li>
+          {% endfor %}
+        </ul>
+        {% if items|length > 1 %}
+          <div class="en-linea">
+            <input name="titulo" placeholder="Título de la Historia nueva" aria-label="Título de la Historia nueva">
+            <button class="boton">Separar marcados</button>
+          </div>
+        {% endif %}
+      </form>
+
+      <div class="correcciones">
+        <form hx-post="/historia/{{ h.id }}/puntuar" hx-target="#h-{{ h.id }}" hx-swap="outerHTML">
+          <h3>Corregir puntuaciones</h3>
+          <div class="en-linea">
+            {% for letra, campo, nombre, just in puntos %}
+              <label>{{ nombre }} <input type="number" name="{{ campo }}" min="0" max="10" value="{{ h[campo] }}" id="p-{{ h.id }}-{{ campo }}"></label>
+            {% endfor %}
+          </div>
+          <div class="en-linea">
+            <input name="motivo" placeholder="Por qué (opcional, ayuda a afinar el perfil)" aria-label="Motivo de la corrección">
+            <button class="boton">Guardar</button>
+          </div>
+        </form>
+        <form hx-post="/historia/{{ h.id }}/fusionar" hx-target="#h-{{ h.id }}" hx-swap="outerHTML">
+          <h3>Fusionar</h3>
+          <div class="en-linea">
+            <label>Absorber la Historia # <input type="number" name="otra" min="1" required id="f-{{ h.id }}"></label>
+            <button class="boton">Fusionar aquí</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </details>
+</article>

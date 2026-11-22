@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from tn.prefiltro import ItemFiltrado
@@ -237,3 +237,32 @@ def detalle_ejecucion(conn: sqlite3.Connection, ejecucion_id: int) -> tuple[sqli
         (ejecucion_id,),
     ).fetchall()
     return cab, filas
+
+
+def estado_fuentes(conn: sqlite3.Connection) -> dict[str, dict]:
+    """Por Fuente: última recogida con éxito, Items de los últimos 7 días y último resultado."""
+    corte = _iso(ahora() - timedelta(days=7))
+    res: dict[str, dict] = {}
+    for f in conn.execute("SELECT fuente_id, ultima_ok FROM cursores"):
+        res.setdefault(f["fuente_id"], {})["ultima_ok"] = f["ultima_ok"]
+    for f in conn.execute(
+        "SELECT fuente_id, COUNT(*) AS n FROM items WHERE recogido_en >= ? GROUP BY fuente_id", (corte,)
+    ):
+        res.setdefault(f["fuente_id"], {})["items_7d"] = f["n"]
+    # Último registro de cada Fuente en cualquier Ejecución.
+    for f in conn.execute(
+        """SELECT ef.fuente_id, ef.error, ef.nuevos, e.inicio
+           FROM ejecucion_fuentes ef JOIN ejecuciones e ON e.id = ef.ejecucion_id
+           WHERE ef.ejecucion_id = (SELECT MAX(ejecucion_id) FROM ejecucion_fuentes x WHERE x.fuente_id = ef.fuente_id)"""
+    ):
+        d = res.setdefault(f["fuente_id"], {})
+        d.update(ultimo_error=f["error"], ultimos_nuevos=f["nuevos"], ultima_vez=f["inicio"])
+    return res
+
+
+def ejecuciones_en_curso(conn: sqlite3.Connection, max_horas: int = 2) -> list[sqlite3.Row]:
+    """Ejecuciones sin terminar y recientes (las antiguas en_curso son restos de un corte)."""
+    corte = _iso(ahora() - timedelta(hours=max_horas))
+    return conn.execute(
+        "SELECT * FROM ejecuciones WHERE estado = 'en_curso' AND inicio >= ? ORDER BY id DESC", (corte,)
+    ).fetchall()

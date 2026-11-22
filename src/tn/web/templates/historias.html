@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block titulo %}Historias{% endblock %}
+{% block contenido %}
+<div class="cabecera-pagina">
+  <div>
+    <h1>Historias</h1>
+    <p class="sub">
+      {% if vista == 'hoy' %}Con Items de las últimas 24 h{% elif vista == 'descartadas' %}Descartadas en los últimos 7 días{% else %}Con Items de los últimos 7 días{% endif %}
+      · {{ tarjetas|length }} Historias
+    </p>
+  </div>
+  <div class="filtros">
+    <div class="segmentado" role="tablist">
+      {% for v, etiqueta in [('hoy','Hoy'), ('semana','Semana'), ('descartadas','Descartadas')] %}
+        <a href="/?vista={{ v }}&orden={{ orden }}" {% if vista == v %}aria-current="true"{% endif %}>{{ etiqueta }}</a>
+      {% endfor %}
+    </div>
+    <div class="segmentado" aria-label="Ordenar por">
+      {% for o, etiqueta in [('peso_semanal','Peso semanal'), ('urgencia','Urgencia'), ('valor_didactico','Didáctico')] %}
+        <a href="/?vista={{ vista }}&orden={{ o }}" {% if orden == o %}aria-current="true"{% endif %}>{{ etiqueta }}</a>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+{% if not tarjetas %}
+  <div class="vacio">
+    <p><strong>No hay Historias en esta vista.</strong></p>
+    {% if pendientes %}
+      <p>Hay {{ pendientes }} Items recogidos esperando al Editor. Lánzalo desde <a href="/ejecuciones">Ejecuciones</a> o con <code>uv run tn editar</code>.</p>
+    {% else %}
+      <p>Lanza el día con el botón de arriba o con <code>uv run tn diario</code>.</p>
+    {% endif %}
+  </div>
+{% else %}
+  <div class="leyenda">
+    <span><b>U</b> Urgencia: ¿hay que hablar hoy?</span>
+    <span><b>D</b> Valor didáctico: ¿da para vídeo explicativo?</span>
+    <span><b>S</b> Peso semanal: ¿va en el Resumen semanal?</span>
+  </div>
+  <div class="lista">
+    {% for t in tarjetas %}
+      {% with h=t['h'], items=t['items'], n_fuentes=t['n_fuentes'], error=None %}
+        {% include "_historia.html" %}
+      {% endwith %}
+    {% endfor %}
+  </div>
+{% endif %}
+{% endblock %}

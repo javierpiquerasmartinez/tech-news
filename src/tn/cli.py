@@ -463,5 +463,16 @@ def cmd_diario(origen: OpcionOrigen = "manual") -> None:
         raise typer.Exit(1)
 
 
+@app.command("ui")
+def cmd_ui(
+    puerto: Annotated[int, typer.Option(help="Puerto local.")] = 8765,
+) -> None:
+    """Interfaz web local para revisar Historias, Fuentes y Ejecuciones (solo en este Mac)."""
+    import uvicorn
+
+    typer.echo(f"tech-news en http://127.0.0.1:{puerto}  (Ctrl+C para parar)")
+    uvicorn.run("tn.web.app:app", host="127.0.0.1", port=puerto, log_level="warning")
+
+
 if __name__ == "__main__":
     app()

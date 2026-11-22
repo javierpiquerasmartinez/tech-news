@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block titulo %}Fuentes{% endblock %}
+{% block contenido %}
+<div class="cabecera-pagina">
+  <div>
+    <h1>Fuentes</h1>
+    <p class="sub">Catálogo de <code>fuentes.yaml</code> · {{ resumen['ok'] }} bien · {{ resumen['error'] }} con error · {{ resumen['explorador'] }} del Explorador · {{ resumen['pausada'] }} pausadas</p>
+  </div>
+</div>
+<div class="tabla-contenedor">
+  <table class="tabla">
+    <thead>
+      <tr><th>Estado</th><th>Fuente</th><th>Grupo</th><th class="num">Items 7 d</th><th>Última recogida OK</th><th>Último resultado</th></tr>
+    </thead>
+    <tbody>
+      {% for x in filas %}
+        <tr>
+          <td><span class="salud salud-{{ x.salud }}">{{ {'ok':'Bien','error':'Error','sin-datos':'Sin datos','explorador':'Explorador','pausada':'Pausada'}[x.salud] }}</span></td>
+          <td><strong>{{ x.f.nombre }}</strong><br><span class="tenue">{{ x.f.id }} · {{ x.f.tipo }}</span></td>
+          <td>{{ x.f.grupo }}</td>
+          <td class="num">{{ x.e.items_7d or 0 }}</td>
+          <td>{{ x.e.ultima_ok|hace }}</td>
+          <td class="resultado">
+            {% if x.e.ultimo_error %}<span class="error-texto">{{ x.e.ultimo_error }}</span>
+            {% elif x.f.nota %}<span class="tenue">{{ x.f.nota }}</span>
+            {% elif x.e.ultima_vez %}{{ x.e.ultimos_nuevos }} nuevos {{ x.e.ultima_vez|hace }}{% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
