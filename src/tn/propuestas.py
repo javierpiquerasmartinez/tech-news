@@ -35,6 +35,38 @@ TRANSICIONES = {
 }
 # Formatos que necesitan exactamente una Historia (se piden para una Historia concreta).
 POR_HISTORIA = ("didactico", "bomba")
+# Formatos con datos que se publican: llevan sección `## Verificación` obligatoria.
+CON_VERIFICACION = ("resumen", "didactico", "bomba", "linkedin")
+_VERIFICACION = re.compile(r"^## Verificaci[oó]n[^\n]*\n(.*?)(?=^## |\Z)", re.M | re.S)
+ESTADOS_DATO = ("✅ oficial", "✅ 2 fuentes", "❌ fuera")
+
+
+def separar_verificacion(contenido: str) -> tuple[str, str]:
+    """(cuerpo sin la sección, tabla de verificación). La verificación no se publica."""
+    m = _VERIFICACION.search(contenido)
+    if not m:
+        return contenido, ""
+    return (contenido[: m.start()] + contenido[m.end():]).strip(), m.group(1).strip()
+
+
+def comprobar_verificacion(tabla: str) -> list[dict]:
+    """Cada fila: dato, fuentes y estado válido; lo marcado ✅ necesita al menos una URL."""
+    filas = []
+    for linea in tabla.splitlines():
+        celdas = [c.strip() for c in linea.strip().strip("|").split("|")]
+        if len(celdas) < 3 or set(celdas[0]) <= set("-: ") or celdas[0].lower() == "dato":
+            continue
+        dato, fuentes, estado = celdas[0], celdas[1], celdas[2]
+        if not any(estado.startswith(e.split(" (")[0]) for e in ESTADOS_DATO):
+            raise PropuestaInvalida(f"Verificación: estado «{estado}» no válido en «{dato}»; usa {', '.join(ESTADOS_DATO)}")
+        if estado.startswith("✅") and "http" not in fuentes:
+            raise PropuestaInvalida(f"Verificación: «{dato}» está como ✅ sin la URL de la fuente que lo confirma")
+        filas.append({"dato": dato, "fuentes": fuentes, "estado": estado})
+    if not filas:
+        raise PropuestaInvalida("Verificación: la tabla está vacía; incluye todos los datos del texto y los Gráficos")
+    return filas
+
+
 # Una Historia pasa a `usada` cuando la persona editora aprueba una Propuesta basada en
 # ella, no cuando el Redactor la escribe. Las ideas no "usan" una Historia: solo el guion.
 NO_MARCAN_USADA = ("ideas-didacticas",)
@@ -210,6 +242,13 @@ def guardar(conn: sqlite3.Connection, formato: str, titulo: str, contenido: str,
         except historias.AccionInvalida as e:
             raise PropuestaInvalida(str(e)) from None
 
+    verificacion = ""
+    if formato in CON_VERIFICACION:
+        contenido, verificacion = separar_verificacion(contenido)
+        if not verificacion:
+            raise PropuestaInvalida("Falta la sección «## Verificación» con la tabla Dato | Fuentes | Estado "
+                                    "(todo dato contrastado con la fuente oficial o con dos fuentes independientes)")
+        comprobar_verificacion(verificacion)
     inicio = semana or semana_por_defecto()
     carpeta = carpeta_semana(inicio)
     ruta = carpeta / _nombre_fichero(formato, titulo, carpeta)
@@ -225,6 +264,8 @@ def guardar(conn: sqlite3.Connection, formato: str, titulo: str, contenido: str,
     }
     if enlace:
         meta["enlace_primer_comentario"] = enlace
+    if verificacion:
+        meta["verificacion"] = verificacion
     p = Propuesta(ruta=ruta, meta=meta, cuerpo=contenido)
     _escribir(p)
     return p
