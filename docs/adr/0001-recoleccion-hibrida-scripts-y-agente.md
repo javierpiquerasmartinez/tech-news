@@ -1,0 +1,3 @@
+# Recolección híbrida: scripts deterministas + agente explorador
+
+La recogida de Items la hacen dos piezas complementarias: scripts deterministas (RSS, HTTP, Gmail etiquetado) que cubren barato y de forma fiable las Fuentes con formato estable, y un agente explorador que navega, sigue enlaces y busca lo que los scripts no ven, para que la cobertura no dependa de que una Fuente tenga feed. El criterio editorial (agrupar en Historias, puntuar, redactar Propuestas) lo hacen agentes con skills de Claude Code, no scripts. Las newsletters se leen de su archivo web o RSS cuando existe; Gmail solo como respaldo y limitado a una etiqueta dedicada.
