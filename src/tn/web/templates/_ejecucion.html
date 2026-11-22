@@ -1,0 +1,21 @@
+<div class="ejecucion-detalle">
+  <p class="tenue">Inicio {{ e.inicio }} · fin {{ e.fin or 'en curso' }}</p>
+  {% set uso = e.uso|json_cargar %}
+  {% if uso %}
+    <p class="uso">
+      {{ uso.modelo or '—' }} · {{ uso.turnos }} turnos · {{ uso.duracion_s }} s ·
+      entrada {{ uso.tokens_entrada }} (+{{ uso.tokens_cache_lectura }} caché) · salida {{ uso.tokens_salida }}
+    </p>
+  {% endif %}
+  {% if fuentes %}
+    <ul class="por-fuente">
+      {% for f in fuentes %}
+        <li>
+          {% if f.error %}<span class="error-texto">✗ {{ f.fuente_id }}: {{ f.error }}</span>
+          {% else %}✓ {{ f.fuente_id }}: {{ f.nuevos }} nuevos <span class="tenue">({{ f.recogidos }} recogidos, {{ f.descartados }} descartados)</span>{% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+  {% if e.resultado %}<pre class="resultado-agente">{{ e.resultado }}</pre>{% endif %}
+</div>

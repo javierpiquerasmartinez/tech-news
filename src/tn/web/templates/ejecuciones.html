@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block titulo %}Ejecuciones{% endblock %}
+{% block contenido %}
+<div class="cabecera-pagina">
+  <div>
+    <h1>Ejecuciones</h1>
+    <p class="sub">Cada pasada de un rol, la lance el horario, tú o Claude.</p>
+  </div>
+  <div class="filtros">
+    {% for a in acciones %}
+      <form method="post" action="/lanzar/{{ a }}">
+        <button class="boton{% if a == 'diario' %} primario{% endif %}" {% if en_curso %}disabled{% endif %}>
+          {{ {'diario':'Lanzar día completo','recoger':'Solo recoger','editar':'Solo editar','explorar':'Solo explorar'}[a] }}
+        </button>
+      </form>
+    {% endfor %}
+  </div>
+</div>
+
+{% if lanzada == 'ocupado' %}
+  <p class="aviso">Ya hay una Ejecución en curso. Espera a que termine.</p>
+{% elif lanzada %}
+  <p class="aviso ok">Lanzado <code>tn {{ lanzada }} --origen web</code>. Recarga para ver cómo avanza; los agentes tardan unos minutos.</p>
+{% endif %}
+
+<div class="tabla-contenedor">
+  <table class="tabla">
+    <thead>
+      <tr><th>#</th><th>Cuándo</th><th>Qué</th><th>Origen</th><th>Estado</th><th class="num">Items</th><th class="num">Historias</th><th class="num">Errores</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for e in filas %}
+        <tr>
+          <td class="tenue">{{ e.id }}</td>
+          <td title="{{ e.inicio }}">{{ e.inicio|hace }}</td>
+          <td><code>{{ e.comando }}</code></td>
+          <td>{{ e.origen }}</td>
+          <td><span class="salud salud-{{ {'ok':'ok','con_errores':'sin-datos','fallida':'error','en_curso':'explorador'}[e.estado] }}">{{ e.estado|replace('_', ' ') }}</span></td>
+          <td class="num">{{ e.nuevos }}</td>
+          <td class="num">{{ e.historias }}</td>
+          <td class="num">{% if e.fuentes %}{{ e.errores or 0 }}/{{ e.fuentes }}{% else %}—{% endif %}</td>
+          <td><button class="boton pequeno" hx-get="/ejecuciones/{{ e.id }}" hx-target="#detalle-{{ e.id }}" hx-swap="innerHTML">Detalle</button></td>
+        </tr>
+        <tr class="fila-detalle"><td colspan="9" id="detalle-{{ e.id }}"></td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

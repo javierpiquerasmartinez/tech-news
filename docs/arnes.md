@@ -188,7 +188,7 @@ Reparto: lo **mecánico** (descartar, aprobar, ver estado) en la web, que no gas
 
 ### Interfaz web
 
-Local, arrancada a demanda con `tn ui` (FastAPI + HTMX). Cuatro pantallas:
+Local, arrancada a demanda con `uv run tn ui` (FastAPI + HTMX) en http://127.0.0.1:8765; solo escucha en este Mac. Los botones llaman a las mismas funciones que la CLI con origen `web`, y "Lanzar día" ejecuta `tn diario --origen web` en segundo plano (su salida queda en `data/registros/`). Pantallas:
 1. **Hoy / Semana**: Historias ordenadas por puntuación, con justificaciones, Items desplegables y las acciones de §7.
 2. **Propuestas**: leer, editar y cambiar estado de las del Paquete semanal.
 3. **Fuentes**: cuáles traen Items y cuáles fallan.

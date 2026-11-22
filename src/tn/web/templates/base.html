@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titulo %}tech-news{% endblock %} · tech-news</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js" defer></script>
+</head>
+<body>
+  <header class="barra">
+    <div class="barra-dentro">
+      <a class="marca" href="/">tech<span>·</span>news</a>
+      <nav>
+        <a href="/" {% if seccion == 'historias' %}aria-current="page"{% endif %}>Historias</a>
+        <a href="/fuentes" {% if seccion == 'fuentes' %}aria-current="page"{% endif %}>Fuentes</a>
+        <a href="/ejecuciones" {% if seccion == 'ejecuciones' %}aria-current="page"{% endif %}>Ejecuciones</a>
+      </nav>
+      <div class="estado-sistema">
+        {% if en_curso %}
+          <a class="pildora en-curso" href="/ejecuciones">● {{ en_curso[0].comando }} en curso</a>
+        {% endif %}
+        {% if pendientes %}
+          <span class="pildora" title="Items recogidos que el Editor aún no ha agrupado">{{ pendientes }} Items sin editar</span>
+        {% endif %}
+        <form method="post" action="/lanzar/diario">
+          <button class="boton primario" {% if en_curso %}disabled title="Ya hay una Ejecución en curso"{% endif %}>Lanzar día</button>
+        </form>
+      </div>
+    </div>
+  </header>
+  <main class="contenido">
+    {% block contenido %}{% endblock %}
+  </main>
+</body>
+</html>
