@@ -15,7 +15,7 @@ from typing import Annotated
 
 import typer
 
-from tn import agentes, avisos, capcut, config, db, historias, horarios, montaje, perfil, propuestas, respaldo
+from tn import agentes, avisos, capcut, config, db, estilo, feedback, historias, horarios, montaje, perfil, propuestas, respaldo
 from tn.fuentes import cargar_fuentes
 from tn.http import Http
 from tn.modelo import ORIGENES, ItemRecogido
@@ -688,6 +688,77 @@ def cmd_perfil_rechazar() -> None:
     typer.echo("Propuesta descartada.")
 
 
+# --- Guía de estilo de edición ------------------------------------------------------------
+
+estilo_app = typer.Typer(help="Revisar la Guía de estilo de edición a partir de las Fichas de feedback.", no_args_is_help=True)
+app.add_typer(estilo_app, name="estilo")
+
+
+@estilo_app.command("notas")
+def cmd_estilo_notas() -> None:
+    """JSON con las notas de las Fichas desde la última revisión (lo usa el agente)."""
+    conn = _conn()
+    try:
+        _json(estilo.notas_pendientes(conn), compacto=True)
+    finally:
+        conn.close()
+
+
+@estilo_app.command("revisar")
+def cmd_estilo_revisar(origen: OpcionOrigen = "manual") -> None:
+    """Propone cambios a estilo-edicion.md si tus notas muestran un patrón. No cambia nada solo."""
+    conn = _conn()
+    try:
+        n = len(estilo.notas_pendientes(conn))
+    finally:
+        conn.close()
+    if estilo.hay_propuesta():
+        typer.echo("Ya hay una propuesta pendiente: `tn estilo diff`, `tn estilo aceptar` o `tn estilo rechazar`.")
+        return
+    if n < estilo.MINIMO_NOTAS:
+        typer.echo(f"Solo hay {n} notas desde la última revisión: no basta para ver un patrón.")
+        return
+    _lanzar_agente("estilo", "", origen)
+    if estilo.hay_propuesta():
+        typer.echo("Propuesta lista: `uv run tn estilo diff`.")
+        _avisar("🎨 Guía de estilo", "Hay una propuesta de cambios a la Guía de estilo de edición a partir de tus notas: `uv run tn estilo diff`.")
+
+
+@estilo_app.command("diff")
+def cmd_estilo_diff() -> None:
+    """Muestra los cambios propuestos a la guía."""
+    try:
+        typer.echo(estilo.diff())
+    except estilo.SinPropuesta as e:
+        _fallar(e)
+
+
+@estilo_app.command("aceptar")
+def cmd_estilo_aceptar() -> None:
+    """Aplica la propuesta a estilo-edicion.md (guarda una copia de la anterior en data/)."""
+    conn = _conn()
+    try:
+        estilo.aceptar(conn)
+    except estilo.SinPropuesta as e:
+        _fallar(e)
+    finally:
+        conn.close()
+    typer.echo("estilo-edicion.md actualizado. Si cambian colores, tipografía o medidas, ajusta también graficos/comun.css.")
+
+
+@estilo_app.command("rechazar")
+def cmd_estilo_rechazar() -> None:
+    """Descarta la propuesta."""
+    conn = _conn()
+    try:
+        estilo.rechazar(conn)
+    except estilo.SinPropuesta as e:
+        _fallar(e)
+    finally:
+        conn.close()
+    typer.echo("Propuesta descartada.")
+
+
 # --- Horarios ---------------------------------------------------------------------------
 
 horarios_app = typer.Typer(help="Instalar y ver las tareas programadas (launchd).", no_args_is_help=True)
@@ -752,7 +823,7 @@ def cmd_programado(tarea: str) -> None:
         "resumen": lambda: cmd_redactar(resumen=True, didactico=True, linkedin=False, post=False, semana=None, origen="horario"),
         "post-diario": lambda: (cmd_redactar(resumen=False, didactico=False, linkedin=False, post=True,
                                              semana=None, origen="horario"), cmd_avisar_post()),
-        "perfil": lambda: cmd_perfil_revisar(origen="horario"),
+        "perfil": lambda: (cmd_perfil_revisar(origen="horario"), cmd_estilo_revisar(origen="horario")),
         "aviso-paquete": cmd_avisar_paquete,
     }
     fallo = None
@@ -895,6 +966,29 @@ def cmd_montaje_graficos_plan(
     typer.echo(f"Plan guardado ({len(plan)} Gráficos).")
     for a in avisos:
         typer.secho(f"⚠ {a}", fg=typer.colors.YELLOW)
+
+
+@montaje_app.command("feedback")
+def cmd_montaje_feedback(
+    semana: Annotated[str, typer.Option(help="Semana editorial del Montaje.")],
+    nota: Annotated[str | None, typer.Argument(help="«02:15 el rótulo tapa la barbilla». Sin nota: lista la Ficha.")] = None,
+) -> None:
+    """Ficha de feedback del Montaje: añade una nota (con minuto delante) o lista las que hay."""
+    m = montaje.Montaje(_semana(semana))
+    if nota:
+        try:
+            n = feedback.anadir(m.semana, nota, montaje.version_actual(m))
+        except ValueError as e:
+            _fallar(e)
+        typer.echo(f"Anotado para {n.version} en {n.minuto}: {n.texto}")
+        typer.echo("Se aplicará al rehacer: `uv run tn montar --semana … --rehacer graficos`.")
+        return
+    notas = feedback.leer(m.semana)
+    if not notas:
+        typer.echo("La Ficha está vacía.")
+    for n in notas:
+        typer.echo(f"{n.version:<3} {n.minuto:>5}  {n.texto}  ({n.fecha})")
+    typer.echo(f"Fichero: {feedback.ruta(m.semana)}")
 
 
 @app.command("montar")

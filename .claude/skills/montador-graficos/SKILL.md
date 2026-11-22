@@ -15,6 +15,7 @@ Ejecutas los comandos **exactamente como aparecen aquí**: sin opciones extra, s
 2. `uv run tn montaje frases --semana <semana>` devuelve un JSON con:
    - `bloques`: por bloque, su `inicio` y `fin` en segundos del Corte, la línea `visual` y las `fuentes` del guion, sus `puntos_clave` y las `frases` que se dicen, cada una con su tiempo `t`;
    - `estructurales`: lo que ya está puesto (cabeceras, sello y final). No lo pises.
+   - `feedback`: notas de la persona editora sobre la versión anterior (`minuto` en el tiempo del vídeo, que es el del Corte) y `plan_anterior`: los Gráficos que decidiste entonces. **Si hay notas, tu trabajo es corregir el plan anterior aplicándolas** (mover, quitar, acortar, cambiar el texto o el tipo), no empezar de cero. Si una nota pide algo que no se arregla con Gráficos (una frase del Corte, el color de la guía…), dilo en tu resumen.
 3. Para cada bloque (los que tienen `dudoso: true` déjalos sin Gráficos), elige **2–4 Gráficos** y su segundo exacto: el `t` de la frase en la que se dice lo que muestran. Que no se pisen entre sí ni con la cabecera del bloque (que ocupa ≈2,6 s desde el inicio del bloque).
 4. Escribe el plan con **Write** en `data/borradores/graficos-<semana>.json` y guárdalo con `uv run tn montaje graficos-plan data/borradores/graficos-<semana>.json --semana <semana>`. Si la CLI lo rechaza, corrige y repite. Los avisos de solape también se corrigen.
 

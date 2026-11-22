@@ -123,7 +123,7 @@ Seis tareas de `launchd` (LaunchAgents en `~/Library/LaunchAgents/com.jpdev.tech
 | Lunes, martes y miércoles 16:30 | `post-diario` | `tn redactar --post`: un post sobre lo más fuerte de las **últimas 48 h** sin post esta semana | ✍️ El post completo, para publicarlo a la mañana siguiente |
 | Jueves 22:00 | `resumen` | `tn redactar --resumen --didactico` | — |
 | Viernes 08:00 | `aviso-paquete` | — | 📦 Resumen semanal e ideas listos, con el gancho |
-| Domingo 22:45 | `perfil` | `tn perfil revisar` (solo si hay ≥ 3 correcciones nuevas) | 🧭 si hay propuesta de cambios |
+| Domingo 22:45 | `perfil` | `tn perfil revisar` y `tn estilo revisar` (cada uno solo si hay ≥ 3 correcciones o notas nuevas) | 🧭 / 🎨 si hay propuesta de cambios |
 
 Gestión: `tn horarios instalar | desinstalar | estado | lanzar <tarea>` y `tn diagnostico [--claude]`.
 
@@ -265,6 +265,8 @@ flowchart LR
 - **Ensamblar:** crea en CapCut un proyecto nuevo «JP Dev <semana> vN» (nunca pisa uno anterior, así que tus retoques a mano están a salvo). Mete el Corte con zoom leve alterno (105 %) en los cortes, los Gráficos en la capa 1, tu círculo durante tablas, pasos y capturas en la capa 2, y la música (apagada en el gancho) con los efectos (whoosh en pantallas completas, pop en rótulos y cabeceras) en la capa 3. Todo en un único ciclo de guardado. **Si CapCut está abierto, se cierra y se reabre**: guarda antes lo que tengas.
 - **Revisar:** `montaje-previa.mp4`, igual que quedará en CapCut (Corte, Gráficos, círculo, música y efectos), más capturas de control en `control/`, y aviso por Telegram. La exportación final la haces tú desde CapCut, tras retocar.
 - **Versión nueva:** `uv run tn montar --semana <fecha> --rehacer ensamblar` crea «… v2» (o `--rehacer graficos`, `--rehacer cortar`).
+- **Ficha de feedback:** `uv run tn montaje feedback --semana <fecha> "02:15 el rótulo tapa la barbilla"` (o dímelo hablando, o edita `semanas/<viernes>/montaje-feedback.md`). Sin nota, la lista. Al rehacer los Gráficos (`--rehacer graficos`), el agente corrige su plan anterior aplicando las notas nuevas; las del Corte se aplican con `tn montaje corte --quitar/--mantener`.
+- **Guía viva:** el domingo a las 22:45, si hay ≥ 3 notas nuevas, `tn estilo revisar` propone cambios a `estilo-edicion.md` (te avisa por Telegram): `tn estilo diff | aceptar | rechazar`. Nunca se aplica sola.
 
 ## 10. Hoja de ruta (fase 1)
 
