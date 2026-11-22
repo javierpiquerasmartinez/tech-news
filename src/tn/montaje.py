@@ -17,7 +17,7 @@ from pathlib import Path
 from tn.db import _iso, ahora
 
 PASOS = ("preparar", "transcribir", "cortar", "graficos", "ensamblar", "revisar")
-IMPLEMENTADOS = ("preparar", "transcribir", "cortar", "graficos")
+IMPLEMENTADOS = PASOS
 EXTENSIONES = (".mp4", ".mov", ".m4v", ".mkv")
 
 # Voz: paso alto, ruido suave fuera, compresión ligera, y −14 LUFS (estándar de YouTube).
@@ -304,6 +304,158 @@ def hacer_graficos(m: "Montaje", con_agente: bool = True, origen: str = "manual"
             "por_tipo": {t: sum(g["tipo"] == t for g in hechos) for t in graficos.DURACIONES}}
 
 
+# --- 5. Ensamblar en CapCut ------------------------------------------------------------------
+
+PANTALLA_COMPLETA_CON_CIRCULO = ("tabla", "pasos", "captura")
+CIRCULO = {"lado": 300, "x": 1920 - 64 - 300, "y": 1080 - 64 - 300}  # = .hueco-circulo de comun.css
+ZOOM_ALTERNO = 1.05
+VOLUMEN_MUSICA = 0.16      # ≈ −16 dB: la música queda muy por debajo de la voz (−14 LUFS)
+VOLUMEN_EFECTOS = 0.5
+
+
+def corte_base(m: Montaje) -> Path:
+    """El Corte a 1080p/30 sin nada encima: de aquí sale el círculo de la persona editora."""
+    salida = m.carpeta / "corte-base.mp4"
+    if salida.is_file() and salida.stat().st_mtime > m.corte.stat().st_mtime:
+        return salida
+    datos = json.loads(m.corte.read_text())
+    partes, ref = [], []
+    for i, t in enumerate(datos["tramos"]):
+        partes.append(f"[0:v]trim={t['inicio']}:{t['fin']},setpts=PTS-STARTPTS,fps=30,scale=1920:1080[v{i}];"
+                      f"[0:a]atrim={t['inicio']}:{t['fin']},asetpts=PTS-STARTPTS[a{i}];")
+        ref.append(f"[v{i}][a{i}]")
+    filtro = "".join(partes) + "".join(ref) + f"concat=n={len(ref)}:v=1:a=1[v][a]"
+    _ffmpeg("-y", "-i", str(m.limpia), "-filter_complex", filtro, "-map", "[v]", "-map", "[a]",
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-c:a", "aac", "-b:a", "192k", str(salida))
+    return salida
+
+
+def circulo(m: Montaje, g: dict, base: Path, destino: Path) -> Path:
+    """La persona editora en un círculo abajo a la derecha durante un Gráfico a pantalla completa."""
+    L, x, y = CIRCULO["lado"], CIRCULO["x"], CIRCULO["y"]
+    r = L / 2 - 1
+    d = g["duracion"]
+    filtro = (f"[0:v]crop=ih:ih:(iw-ih)/2:0,scale={L}:{L},format=rgba,"
+              f"geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='if(lte(hypot(X-{L/2},Y-{L/2}),{r}),255,0)',"
+              f"fade=t=in:st=0:d=0.3:alpha=1,fade=t=out:st={max(d - 0.35, 0):.2f}:d=0.3:alpha=1[c];"
+              f"color=c=black@0.0:s=1920x1080:r=30:d={d:.2f},format=rgba[lienzo];"
+              f"[lienzo][c]overlay={x}:{y}:shortest=1,format=yuva444p10le[v]")
+    _ffmpeg("-y", "-ss", f"{g['inicio']:.3f}", "-t", f"{d:.3f}", "-i", str(base), "-filter_complex", filtro,
+            "-map", "[v]", "-an", "-c:v", "prores_ks", "-profile:v", "4444", "-pix_fmt", "yuva444p10le", str(destino))
+    return destino
+
+
+def _audios(carpeta: Path, palabras: tuple[str, ...] = ()) -> list[Path]:
+    if not carpeta.is_dir():
+        return []
+    fs = sorted(f for f in carpeta.iterdir() if f.suffix.lower() in (".mp3", ".wav", ".m4a", ".aac", ".aiff"))
+    return [f for f in fs if not palabras or any(p in f.name.lower() for p in palabras)]
+
+
+def mezcla_audio(m: Montaje, plan: list[dict], duracion: float, destino: Path) -> Path | None:
+    """Música de fondo (apagada en el gancho) y efectos en los Gráficos, como un clip transparente
+    con sonido: el kit no tiene pista de audio, pero CapCut reproduce el sonido de las capas."""
+    audio = raiz_montajes() / "audio"
+    musicas = _audios(audio / "musica")
+    whoosh = _audios(audio / "efectos", ("whoosh", "swoosh", "swish", "transition"))
+    pop = _audios(audio / "efectos", ("pop", "click", "tick"))
+    if not musicas and not whoosh and not pop:
+        return None
+    sello = next((g["inicio"] for g in plan if g["tipo"] == "sello"), 0.0)
+    entradas = ["-f", "lavfi", "-i", f"color=c=black@0.0:s=64x36:r=30:d={duracion:.2f},format=rgba"]
+    filtros, mezcla = [], []
+    k = 1
+    if musicas:
+        musica = musicas[m.semana.isocalendar().week % len(musicas)]
+        entradas += ["-stream_loop", "-1", "-i", str(musica)]
+        filtros.append(f"[{k}:a]atrim=0:{duracion:.2f},asetpts=PTS-STARTPTS,"
+                       f"volume='if(lt(t,{sello:.2f}),0,{VOLUMEN_MUSICA})':eval=frame,"
+                       f"afade=t=in:st={sello:.2f}:d=1.5,afade=t=out:st={max(duracion - 3, 0):.2f}:d=3[m]")
+        mezcla.append("[m]")
+        k += 1
+    for n, g in enumerate(plan):
+        if g["tipo"] in ("tabla", "pasos", "captura", "sello", "final"):
+            efecto = whoosh[n % len(whoosh)] if whoosh else None
+        elif g["tipo"] in ("rotulo", "cabecera"):
+            efecto = pop[n % len(pop)] if pop else None
+        else:
+            efecto = None
+        if not efecto:
+            continue
+        ms = int(g["inicio"] * 1000)
+        entradas += ["-i", str(efecto)]
+        filtros.append(f"[{k}:a]volume={VOLUMEN_EFECTOS},adelay={ms}|{ms}[e{k}]")
+        mezcla.append(f"[e{k}]")
+        k += 1
+    filtros.append("".join(mezcla) + f"amix=inputs={len(mezcla)}:normalize=0:duration=longest,"
+                   f"atrim=0:{duracion:.2f}[a]")
+    _ffmpeg("-y", *entradas, "-filter_complex", ";".join(filtros), "-map", "0:v", "-map", "[a]",
+            "-c:v", "qtrle", "-c:a", "aac", "-b:a", "192k", "-t", f"{duracion:.2f}", str(destino))
+    return destino
+
+
+def ensamblar(m: Montaje, al_avanzar=None) -> dict:
+    from tn import capcut
+
+    avisar = al_avanzar or (lambda _: None)
+    plan = json.loads((m.carpeta / "graficos.json").read_text())
+    trabajo = capcut.carpeta_trabajos() / m.trabajo
+    assets = trabajo / "assets"
+    plan = [g for g in plan if (assets / f"{g['id']}.mov").is_file()]
+    duracion = max([json.loads(m.corte.read_text())["duracion_corte"]] + [g["inicio"] + g["duracion"] for g in plan])
+
+    avisar("ensamblar: círculo para los Gráficos a pantalla completa")
+    base = corte_base(m)
+    circulos = []
+    for g in plan:
+        if g["tipo"] in PANTALLA_COMPLETA_CON_CIRCULO:
+            circulos.append((g, circulo(m, g, base, assets / f"{g['id']}-circulo.mov")))
+    avisar("ensamblar: música y efectos")
+    audio = mezcla_audio(m, plan, duracion, assets / "audio-mezcla.mov")
+
+    nombre = capcut.nombre_libre(f"JP Dev {m.semana.isoformat()}")
+    avisar(f"ensamblar: proyecto «{nombre}» en CapCut (si está abierto, se cierra y se reabre)")
+    capcut.crear_proyecto(m.trabajo, nombre)
+    capas = [{"fichero": str(assets / f"{g['id']}.mov"), "inicio": g["inicio"], "nivel": 1, "silencio": True} for g in plan]
+    capas += [{"fichero": str(f), "inicio": g["inicio"], "nivel": 2, "silencio": True} for g, f in circulos]
+    if audio:
+        capas.append({"fichero": str(audio), "inicio": 0.0, "nivel": 3, "silencio": False})
+    capcut.editar_proyecto(nombre, capas, ZOOM_ALTERNO, m.carpeta)
+    return {"proyecto": nombre, "graficos": len(plan), "circulos": len(circulos),
+            "musica_y_efectos": bool(audio), "duracion_s": round(duracion, 1)}
+
+
+# --- 6. Revisar -------------------------------------------------------------------------------
+
+
+def revisar(m: Montaje, al_avanzar=None) -> dict:
+    """Vista previa fiel (Corte + Gráficos + círculo + música y efectos) y capturas de control."""
+    from tn import capcut
+
+    if al_avanzar:
+        al_avanzar("revisar: vista previa")
+    salida = previa_corte(m, completa=True)
+    assets = capcut.carpeta_trabajos() / m.trabajo / "assets"
+    plan = json.loads((m.carpeta / "graficos.json").read_text())
+    control = m.carpeta / "control"
+    control.mkdir(exist_ok=True)
+    capturas = []
+    for g in plan:
+        if (assets / f"{g['id']}.mov").is_file():
+            t = g["inicio"] + min(g["duracion"] * 0.6, g["duracion"] - 0.5)
+            destino = control / f"{g['id']}.jpg"
+            _ffmpeg("-y", "-ss", f"{t:.2f}", "-i", str(salida), "-frames:v", "1", str(destino))
+            capturas.append(str(destino))
+    from tn import avisos
+
+    proyecto = m.estado()["pasos"].get("ensamblar", {}).get("proyecto", "—")
+    avisos.avisar("🎬 Montaje listo",
+                  f"Semana {m.semana.isoformat()} · proyecto de CapCut «{proyecto}».\n"
+                  f"Vista previa: {salida}\nÁbrelo en CapCut, retócalo y expórtalo. "
+                  f"Las notas para la siguiente versión van en la Ficha de feedback.")
+    return {"previa": str(salida), "capturas_de_control": len(capturas), "proyecto": proyecto}
+
+
 # --- Orquestación ------------------------------------------------------------------------
 
 
@@ -335,44 +487,50 @@ def montar(semana: date, hasta: str = "cortar", rehacer: str | None = None, al_a
             detalle = cortar(m)
         elif paso == "graficos":
             detalle = hacer_graficos(m, con_agente=con_agente, origen=origen, al_avanzar=al_avanzar)
+        elif paso == "ensamblar":
+            detalle = ensamblar(m, al_avanzar=al_avanzar)
+        elif paso == "revisar":
+            detalle = revisar(m, al_avanzar=al_avanzar)
         m.marcar(paso, **detalle)
         resultados[paso] = detalle
     return resultados
 
 
-def previa_corte(m: Montaje) -> Path:
-    """MP4 rápido del Corte, con los Gráficos encima si ya están hechos, para verlo sin CapCut.
+def previa_corte(m: Montaje, completa: bool = False) -> Path:
+    """MP4 del Corte con los Gráficos encima, para verlo sin CapCut.
 
-    No es el montaje final (sin círculo, música ni efectos): sirve para revisar ritmo y tiempos.
+    `completa`: además el círculo de la persona editora y la música y efectos, como quedará
+    en CapCut (lo que hace el paso revisar).
     """
     from tn import capcut
 
     datos = json.loads(m.corte.read_text())
-    partes, ref = [], []
-    for i, t in enumerate(datos["tramos"]):
-        partes.append(f"[0:v]trim={t['inicio']}:{t['fin']},setpts=PTS-STARTPTS,fps=30,scale=1920:1080[v{i}];"
-                      f"[0:a]atrim={t['inicio']}:{t['fin']},asetpts=PTS-STARTPTS[a{i}];")
-        ref.append(f"[v{i}][a{i}]")
-    filtro = "".join(partes) + "".join(ref) + f"concat=n={len(ref)}:v=1:a=1[base][aud];"
-    entradas = ["-i", str(m.limpia)]
+    base = corte_base(m)
+    entradas = ["-i", str(base)]
     plan = json.loads((m.carpeta / "graficos.json").read_text()) if (m.carpeta / "graficos.json").is_file() else []
     assets = capcut.carpeta_trabajos() / m.trabajo / "assets"
     plan = [g for g in plan if (assets / f"{g['id']}.mov").is_file()]
     extra = max([g["inicio"] + g["duracion"] - datos["duracion_corte"] for g in plan] + [0])
-    actual = "base"
-    if extra > 0:  # la pantalla final dura más que el Corte: congela el último fotograma
-        filtro += f"[base]tpad=stop_mode=clone:stop_duration={extra:.2f}[base2];[aud]apad=pad_dur={extra:.2f}[aud2];"
-        actual, audio = "base2", "aud2"
-    else:
-        audio = "aud"
-    for k, g in enumerate(plan, start=1):
-        entradas += ["-i", str(assets / f"{g['id']}.mov")]
+    filtro = (f"[0:v]tpad=stop_mode=clone:stop_duration={extra:.2f}[base];[0:a]apad=pad_dur={extra:.2f}[voz];"
+              if extra > 0 else "[0:v]null[base];[0:a]anull[voz];")
+    actual, k = "base", 1
+    capas = [(g, assets / f"{g['id']}.mov") for g in plan]
+    if completa:
+        capas += [(g, assets / f"{g['id']}-circulo.mov") for g in plan if (assets / f"{g['id']}-circulo.mov").is_file()]
+    for g, fichero in capas:
+        entradas += ["-i", str(fichero)]
         fin = g["inicio"] + g["duracion"]
         filtro += (f"[{k}:v]setpts=PTS+{g['inicio']}/TB[g{k}];"
                    f"[{actual}][g{k}]overlay=0:0:eof_action=pass:enable='between(t,{g['inicio']},{fin})'[o{k}];")
-        actual = f"o{k}"
+        actual, k = f"o{k}", k + 1
+    audio = "voz"
+    mezcla = assets / "audio-mezcla.mov"
+    if completa and mezcla.is_file():
+        entradas += ["-i", str(mezcla)]
+        filtro += f"[voz][{k}:a]amix=inputs=2:normalize=0:duration=first[mix];"
+        audio = "mix"
     filtro += f"[{actual}]scale=-2:720[vout]"
-    salida = m.carpeta / "corte-previa.mp4"
+    salida = m.carpeta / ("montaje-previa.mp4" if completa else "corte-previa.mp4")
     _ffmpeg("-y", *entradas, "-filter_complex", filtro, "-map", "[vout]", "-map", f"[{audio}]",
             "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-c:a", "aac", "-b:a", "160k", str(salida))
     return salida
