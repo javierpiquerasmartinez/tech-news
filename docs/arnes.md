@@ -266,3 +266,11 @@ flowchart LR
 3. **Interfaz web** ([#3](https://github.com/javierpiquerasmartinez/tech-news/issues/3)): Hoy/Semana, acciones sobre Historias, Ejecuciones, Fuentes.
 4. **Redactor** ([#4](https://github.com/javierpiquerasmartinez/tech-news/issues/4)): skill, `voz.md` (mini entrevista), Formatos, pantalla de Propuestas.
 5. **Automatización** ([#5](https://github.com/javierpiquerasmartinez/tech-news/issues/5)): `launchd`, Telegram, backup, `tn perfil revisar`.
+
+## 11. Hoja de ruta (fase 2)
+
+1. **Requisitos, audio limpio y transcripción** ([#17](https://github.com/javierpiquerasmartinez/tech-news/issues/17))
+2. **El Corte** ([#18](https://github.com/javierpiquerasmartinez/tech-news/issues/18))
+3. **Gráficos con HyperFrames y capturas de fuente** ([#19](https://github.com/javierpiquerasmartinez/tech-news/issues/19))
+4. **Ensamblar en CapCut, música, efectos y vista previa** ([#20](https://github.com/javierpiquerasmartinez/tech-news/issues/20))
+5. **Guía de estilo viva** ([#21](https://github.com/javierpiquerasmartinez/tech-news/issues/21))
