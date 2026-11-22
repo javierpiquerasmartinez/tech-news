@@ -115,12 +115,26 @@ Se detecta en la Ejecución diaria (máximo un día de retraso, [ADR-0002](adr/0
 
 ## 5. Horarios
 
-| Cuándo | Qué | Comando | Aviso |
+Seis tareas de `launchd` (LaunchAgents en `~/Library/LaunchAgents/com.jpdev.tech-news.*`). Cada una llama a `tn programado <tarea>`, que espera si ya hay algo en curso, ejecuta y, si falla, avisa por Telegram. La salida queda en `data/registros/horario-<tarea>.log`.
+
+| Cuándo | Tarea | Qué hace | Aviso |
 |---|---|---|---|
-| Diario 16:00 | Recolector → Editor (+Explorador) → bomba si procede → backup | `tn diario` | Solo si hay Historia bomba |
-| Jueves 22:00 | Redactor: Resumen semanal + ideas de Vídeo didáctico | `tn redactar --resumen` | Viernes 08:00 |
-| Domingo 22:00 | Redactor: 3 Posts de LinkedIn | `tn redactar --linkedin` | Lunes 08:00 |
-| Domingo 22:00 | Editor: propuesta de cambios al Perfil editorial | `tn perfil revisar` | Con el aviso del lunes |
+| Diario 16:00 | `diario` | Recolector → Editor (máx. 200 Items, `TN_MAX_ITEMS_DIARIO`) → Explorador → Editor → Vídeo bomba si procede → copia de seguridad | 💥 al momento si hay Historia bomba |
+| Jueves 22:00 | `resumen` | `tn redactar --resumen --didactico` | — |
+| Viernes 08:00 | `aviso-paquete` | — | 📦 Resumen semanal e ideas listos, con el gancho |
+| Domingo 22:00 | `linkedin` | `tn redactar --linkedin` | — |
+| Domingo 22:45 | `perfil` | `tn perfil revisar` (solo si hay ≥ 3 correcciones nuevas) | — |
+| Lunes 08:00 | `aviso-posts` | — | ✍️ Los 3 posts, uno por mensaje, para copiarlos desde el móvil |
+
+Gestión: `tn horarios instalar | desinstalar | estado | lanzar <tarea>` y `tn diagnostico [--claude]`.
+
+### Puesta en marcha (una vez)
+
+1. Crea un bot con @BotFather en Telegram y pon su token en `.env` como `TN_TELEGRAM_TOKEN=…` (plantilla en `.env.example`).
+2. Escríbele cualquier cosa al bot y ejecuta `uv run tn avisos vincular`; prueba con `uv run tn avisos prueba`.
+3. `uv run tn horarios instalar` y comprueba con `uv run tn diagnostico --claude`.
+
+La copia de seguridad diaria (SQLite + `semanas/` + perfil, voz y fuentes) va a `~/Documents/tech-news-respaldos` (o `TN_RESPALDOS`) y se conservan las 14 últimas. A mano: `uv run tn respaldar`.
 
 **Semana editorial:** de viernes a jueves. La carpeta de una semana se nombra por su viernes de inicio: `semanas/2026-11-20/` contiene los posts entregados el lunes 23 y el Resumen semanal entregado el viernes 27.
 
@@ -177,7 +191,7 @@ Toda acción pasa por la CLI `tn` ([ADR-0004](adr/0004-cli-unica-como-punto-de-e
 | Generar el paquete semanal antes | `tn redactar --resumen` | `/redactar` | Ejecuciones |
 | Ver / aprobar / descartar una Propuesta | `tn propuestas` · `tn propuesta ver <fichero>` · `tn propuesta estado <fichero> aprobada` | "apruebo el post 2" | Propuestas |
 | Revisar la semana con criterio | — | `/revisar-semana` | — |
-| Afinar el Perfil editorial | `tn perfil revisar` | "esta semana sobraba cripto" | — |
+| Afinar el Perfil editorial | `tn perfil revisar` · `tn perfil diff` · `tn perfil aceptar`/`rechazar` | "esta semana sobraba cripto" | — |
 | Ver qué ha fallado | `tn ejecuciones` | "¿qué tal fue la última ejecución?" | Ejecuciones / Fuentes |
 
 Toda acción acepta `--origen manual|horario|claude|web` para que el registro diga quién la lanzó (`tn` usa `manual` por defecto; yo uso `claude`). Las correcciones sobre Historias (descartar, destacar, restaurar, puntuar, fusionar, separar) quedan guardadas como decisiones, que alimentan `tn perfil revisar`.
