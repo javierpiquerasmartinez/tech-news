@@ -54,7 +54,7 @@ Reglas de entrada:
 | **Explorador** | Skill de Claude Code | Lista fija sin feed + 5 Historias más urgentes | Items | Sí (acotado) |
 | **Editor** | Skill de Claude Code | Items nuevos + `perfil-editorial.md` | Historias puntuadas, aviso de Historia bomba | Sí |
 | **Redactor** | Skill de Claude Code | Historias de la Semana editorial + `voz.md` | Propuestas en `semanas/` | Sí |
-| **Montador** | Fase 2 | Guion aprobado + tu grabación | Vídeo editado | Por diseñar |
+| **Montador** | Fase 2: CLI + skill de Claude Code | Guion aprobado + tu Grabación | Montaje de CapCut | Sí (Corte y Gráficos) |
 
 Tareas cerradas del **Explorador** cada día:
 1. Revisar las Fuentes sin feed: Anthropic News, changelog API OpenAI, changelog API Gemini, GitHub Trending.
