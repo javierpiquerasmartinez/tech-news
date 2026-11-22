@@ -112,7 +112,8 @@ def listar(inicio: date | None = None) -> list[Propuesta]:
     res = []
     for c in carpetas:
         if c.is_dir():
-            res += [leer(f) for f in sorted(c.glob("*.md"))]
+            # Solo Propuestas: la Ficha de feedback y otros Markdown de la semana no llevan `formato`.
+            res += [p for p in (leer(f) for f in sorted(c.glob("*.md"))) if p.meta.get("formato") in FORMATOS]
     orden = list(FORMATOS)
     return sorted(res, key=lambda p: (str(p.ruta.parent), orden.index(p.meta.get("formato", "resumen")) if p.meta.get("formato") in orden else 99, p.ruta.name))
 

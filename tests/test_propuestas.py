@@ -131,3 +131,9 @@ def test_post_diario_solo_mira_lo_reciente(conn):
     conn.commit()
     ids = [h["id"] for h in propuestas.contexto(conn, "linkedin", horas=48)["historias_candidatas"]]
     assert 2 not in ids and 1 in ids
+
+
+def test_la_ficha_de_feedback_no_es_una_propuesta(conn, tmp_path):
+    p = propuestas.guardar(conn, "resumen", "Resumen", "v1", [1])
+    (p.ruta.parent / "montaje-feedback.md").write_text("# Ficha\n\n- v1 · 00:10 · algo · 2026-11-22\n")
+    assert [x.ruta.name for x in propuestas.listar(propuestas.inicio_semana(date.today()))] == ["resumen-semanal.md"]
