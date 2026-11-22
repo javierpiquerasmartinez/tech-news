@@ -253,7 +253,8 @@ flowchart LR
 ```
 
 - **Grabación:** de un tirón; si te equivocas, pausa de 2 s y repite la frase. El Montador se queda con la última Toma buena.
-- **Gráficos:** cabecera de bloque, rótulo de dato, infografía animada y captura de fuente (ver la guía). Imágenes generadas con Gemini solo si no hay nada real que enseñar.
+- **Gráficos:** cabecera de bloque, rótulo de dato, infografía animada y captura de fuente (ver la guía).
+- **Generación con IA (Gemini: imagen, vídeo, voz):** solo cuando no hay nada real que enseñar y **siempre con tu aprobación previa en cada uso**. El Montador propone qué generaría, con un prompt y su coste estimado; nada se genera hasta que dices que sí. La clave va en `.env` como `TN_GEMINI_API_KEY`.
 - **Música y efectos:** de la Biblioteca de audio de YouTube, en `~/Movies/jpdev/audio/musica/` y `~/Movies/jpdev/audio/efectos/`.
 - **Iteración:** v1 → tu feedback (con minuto) → v2… Una vez retocado a mano en CapCut, el Montador solo **añade**.
 - **Requisitos:** CapCut instalado en este Mac, `~/git/jpdev/capcut-kit` clonado con sus `capcut-templates/`, ffmpeg y node.
