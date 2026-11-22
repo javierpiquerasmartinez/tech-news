@@ -101,11 +101,12 @@ def cmd_ejecuciones(
         if not filas:
             typer.echo("Todavía no hay Ejecuciones. Lanza `tn recoger`.")
             return
-        typer.echo(f"{'#':>4}  {'inicio (UTC)':<20} {'origen':<8} {'comando':<18} {'estado':<12} {'nuevos':>6}  errores")
+        typer.echo(f"{'#':>4}  {'inicio (UTC)':<20} {'origen':<8} {'comando':<18} {'estado':<12} {'items':>5} {'hist.':>5}  errores")
         for e in filas:
+            errores = f"{e['errores'] or 0}/{e['fuentes']}" if e["fuentes"] else "—"
             typer.echo(
                 f"{e['id']:>4}  {e['inicio'][:19]:<20} {e['origen']:<8} {e['comando'][:18]:<18} "
-                f"{e['estado']:<12} {e['nuevos']:>6}  {e['errores'] or 0}/{e['fuentes']}"
+                f"{e['estado']:<12} {e['nuevos']:>5} {e['historias']:>5}  {errores}"
             )
     finally:
         conn.close()

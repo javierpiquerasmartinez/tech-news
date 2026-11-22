@@ -218,7 +218,9 @@ def guardar_cursor(conn: sqlite3.Connection, fuente_id: str, momento: datetime) 
 def ultimas_ejecuciones(conn: sqlite3.Connection, limite: int = 10) -> list[sqlite3.Row]:
     return conn.execute(
         """
-        SELECT e.*, COALESCE(SUM(f.nuevos), 0) AS nuevos,
+        SELECT e.*,
+               (SELECT COUNT(*) FROM items i WHERE i.ejecucion_id = e.id) AS nuevos,
+               (SELECT COUNT(*) FROM historias h WHERE h.ejecucion_id = e.id) AS historias,
                COUNT(f.fuente_id) AS fuentes,
                SUM(CASE WHEN f.error IS NOT NULL THEN 1 ELSE 0 END) AS errores
         FROM ejecuciones e LEFT JOIN ejecucion_fuentes f ON f.ejecucion_id = e.id
