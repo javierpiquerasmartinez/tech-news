@@ -30,7 +30,7 @@ def es_no_editorial(titulo: str) -> bool:
     return bool(_NO_EDITORIAL.search(titulo))
 
 
-def prefiltrar(items: list[ItemRecogido]) -> ResultadoPrefiltro:
+def prefiltrar(items: list[ItemRecogido], conservar_fragmento: bool = False) -> ResultadoPrefiltro:
     """Quita patrocinios, Items sin URL o título y duplicados por URL normalizada."""
     aceptados: list[ItemFiltrado] = []
     vistas: set[tuple[str, str]] = set()
@@ -40,7 +40,7 @@ def prefiltrar(items: list[ItemRecogido]) -> ResultadoPrefiltro:
         if not titulo or not item.url or es_no_editorial(titulo):
             descartados += 1
             continue
-        url_n = normalizar_url(item.url)
+        url_n = normalizar_url(item.url, conservar_fragmento)
         clave = (item.fuente_id, url_n)
         if clave in vistas:
             descartados += 1

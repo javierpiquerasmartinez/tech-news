@@ -7,7 +7,7 @@ How the system works (roles, schedules, commands): `docs/arnes.md`. Every action
 - Python 3.12 with `uv`. Install: `uv sync`. Run: `uv run tn --help`. Tests: `uv run pytest`.
 - Source catalog: `fuentes.yaml` (adding a source needs no code). Data: `data/tech-news.db` (SQLite, gitignored).
 - Tests never hit the network: parsers are tested against fixtures in `tests/fixtures/`.
-- When running `tn` on the user's behalf from Claude Code, pass `--origen claude`.
+- When running `tn` on the user's behalf from an interactive Claude Code session, pass `--origen claude` to the commands that accept it (`recoger`, `editar`, `explorar`, `diario` and the `historia` corrections). Role skills run headless (`editor`, `explorador`) follow their skill's commands exactly and never add `--origen`.
 
 ## Agent skills
 

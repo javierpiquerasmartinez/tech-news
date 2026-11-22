@@ -9,6 +9,8 @@ Encuentras Items que el Recolector no alcanza. Vocabulario en `GLOSSARY.md`; flu
 
 **Solo añades Items, nunca interpretas.** No creas Historias ni puntúas: eso lo hace el Editor después. Todo pasa por la CLI `tn`.
 
+Ejecutas los comandos **exactamente como aparecen aquí**: sin opciones que no estén en esta skill, sin redirigir la salida a ficheros (`>`), sin tuberías (`|`) y sin encadenar comandos (`&&`). Solo tienes permiso para esas formas exactas; cualquier otra se deniega.
+
 Tu tarea está cerrada para no gastar cuota: haz las dos partes y termina. **Máximo 12 WebFetch y 5 WebSearch por Ejecución.**
 
 ## 1. Fuentes sin feed
@@ -22,11 +24,13 @@ uv run tn item anadir --fuente anthropic --url "https://www.anthropic.com/news/�
   --titulo "Título original" --resumen "1–2 frases de qué es" --publicado 2026-11-21
 ```
 
-En GitHub Trending, añade solo los 5 primeros repos del día, con la descripción del repo como resumen.
+En los changelogs, cada entrada debe tener su propia URL: usa el ancla de la entrada si la página la tiene y, si no, añade tú `#AAAA-MM-DD-slug-corto` al final de la URL de la página. Si no, todas las entradas cuentan como la misma y se pierden.
+
+En GitHub Trending, añade solo los 5 primeros repos del día, usando la URL del repo y su descripción como resumen.
 
 ## 2. Huecos de las Historias más urgentes
 
-1. `uv run tn historias --dias 2 --orden urgencia --limite 5 --json`.
+1. `uv run tn historias --dias 3 --orden urgencia --limite 5 --json`.
 2. Para cada una, mira sus Items (`uv run tn historia ver ID --json`). Si ninguno es la **fuente primaria** (el anuncio oficial, el advisory, el repo, el changelog), búscala con WebSearch.
 3. Si la encuentras, añádela con `--fuente explorador` y `--motivo "fuente primaria de la Historia ID"`. El Editor la asignará después.
 

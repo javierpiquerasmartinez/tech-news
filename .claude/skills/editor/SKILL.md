@@ -9,6 +9,8 @@ Conviertes Items recogidos en **Historias** puntuadas. Vocabulario en `GLOSSARY.
 
 **Solo interpretas, nunca recoges.** No escribes en la base de datos ni en ficheros: todo pasa por la CLI `tn`.
 
+Ejecutas los comandos **exactamente como aparecen aquí**: sin opciones que no estén en esta skill, sin redirigir la salida a ficheros (`>`), sin tuberías (`|`) y sin encadenar comandos (`&&`). Solo tienes permiso para esas formas exactas; cualquier otra se deniega. Lee la salida JSON directamente.
+
 ## Antes de empezar
 
 Lee `perfil-editorial.md` entero. Es tu criterio: áreas y su peso, lo que puntúa bajo, la tabla de calibración y el listón de Historia bomba.
@@ -41,9 +43,10 @@ Los resúmenes de las newsletters bastan para casi todo. Usa WebFetch para leer 
 
 ## Formato del lote
 
+Pásalo como **un único argumento `--lote` entre comillas simples**, en una línea o en varias (heredocs, ficheros y stdin no están permitidos):
+
 ```bash
-uv run tn editor aplicar - <<'EOF'
-{
+uv run tn editor aplicar --lote '{
   "nuevas": [
     {"titulo": "PostgreSQL 19 sale con …", "resumen": "2–3 frases en español: qué ha pasado y por qué importa a un dev full stack.",
      "area": "desarrollo", "items": [101, 230],
@@ -56,10 +59,10 @@ uv run tn editor aplicar - <<'EOF'
     {"historia": 12, "items": [305], "urgencia": 7, "just_urgencia": "Se confirma explotación activa"}
   ],
   "ruido": [44, 45, 46]
-}
-EOF
+}'
 ```
 
+- Dentro del JSON **no uses comilla simple recta** (`'`), porque cerraría el argumento. Si necesitas un apóstrofo, usa `’`.
 - `area`: `ia` | `desarrollo` | `seguridad` | `cloud-devops` | `industria` | `otros`.
 - `titulo` y `resumen` siempre en **español**, aunque los Items estén en inglés. El título nombra el hecho, sin clickbait.
 - En `anadir`, las puntuaciones son opcionales. Si mandas una, mándala con su justificación.

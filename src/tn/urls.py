@@ -16,8 +16,12 @@ def _es_seguimiento(clave: str) -> bool:
     return k.startswith("utm_") or k in _PARAMS_SEGUIMIENTO
 
 
-def normalizar_url(url: str) -> str:
-    """Forma canónica de una URL: sin seguimiento, sin fragmento, host en minúsculas."""
+def normalizar_url(url: str, conservar_fragmento: bool = False) -> str:
+    """Forma canónica de una URL: sin seguimiento, sin fragmento, host en minúsculas.
+
+    `conservar_fragmento` es para páginas con varias entradas (changelogs), donde el
+    `#ancla` es lo único que distingue una entrada de otra.
+    """
     partes = urlsplit(url.strip())
     esquema = (partes.scheme or "https").lower()
     if esquema == "http":
@@ -33,4 +37,4 @@ def normalizar_url(url: str) -> str:
     query = sorted(
         (k, v) for k, v in parse_qsl(partes.query, keep_blank_values=True) if not _es_seguimiento(k)
     )
-    return urlunsplit((esquema, host, ruta, urlencode(query), ""))
+    return urlunsplit((esquema, host, ruta, urlencode(query), partes.fragment if conservar_fragmento else ""))

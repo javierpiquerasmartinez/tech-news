@@ -171,10 +171,16 @@ def cmd_editor_pendientes(
 
 @editor_app.command("aplicar")
 def cmd_editor_aplicar(
-    fichero: Annotated[str, typer.Argument(help="Fichero JSON con el lote, o - para leer de stdin.")] = "-",
+    fichero: Annotated[str | None, typer.Argument(help="Fichero JSON con el lote, o - para leer de stdin.")] = None,
+    lote_txt: Annotated[str | None, typer.Option("--lote", help="El lote como texto JSON (lo usa el Editor headless).")] = None,
 ) -> None:
     """Aplica un lote de decisiones del Editor (todo o nada)."""
-    texto = sys.stdin.read() if fichero == "-" else Path(fichero).read_text(encoding="utf-8")
+    if lote_txt is not None:
+        texto = lote_txt
+    elif fichero and fichero != "-":
+        texto = Path(fichero).read_text(encoding="utf-8")
+    else:
+        texto = sys.stdin.read()
     try:
         lote = json.loads(texto)
     except json.JSONDecodeError as e:
@@ -368,7 +374,7 @@ def cmd_item_anadir(
             raise typer.BadParameter("--publicado debe ser AAAA-MM-DD") from None
     item = ItemRecogido(fuente_id=fuente, url=url, titulo=titulo, resumen=resumen, publicado_en=fecha,
                         origen=f"explorador: {motivo}" if motivo else "explorador")
-    filtrado = prefiltrar([item])
+    filtrado = prefiltrar([item], conservar_fragmento=True)
     if not filtrado.aceptados:
         typer.echo("Descartado por el prefiltro (patrocinio, sin título o sin URL).")
         return
