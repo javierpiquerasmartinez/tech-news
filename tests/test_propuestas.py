@@ -117,3 +117,9 @@ def test_pantalla_de_propuestas(conn):
     r = cliente.post("/propuesta/editar", data={"f": p.relativa, "cuerpo": "Nuevo texto"})
     assert "Nuevo texto" in r.text
     assert cliente.get("/propuesta", params={"f": "voz.md"}).status_code == 404
+
+
+def test_regenerar_el_resumen_no_excluye_lo_que_ya_usaba(conn):
+    propuestas.guardar(conn, "resumen", "Resumen v1", "v1", [1, 2])
+    ctx = propuestas.contexto(conn, "resumen")
+    assert {1, 2} <= {h["id"] for h in ctx["historias_candidatas"]}

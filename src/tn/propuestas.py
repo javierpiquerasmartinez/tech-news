@@ -153,7 +153,10 @@ def contexto(conn: sqlite3.Connection, formato: str, *, semana: date | None = No
             "linkedin": ("peso_semanal", momento - timedelta(days=7), 12),
             "ideas-didacticas": ("valor_didactico", momento - timedelta(days=14), 12),
         }[formato]
-        usadas_en_formato = {h for p in ya if p["formato"] == formato for h in p["historias"]}
+        # Solo LinkedIn acumula varias Propuestas por semana; el resumen y las ideas se
+        # reescriben enteros, así que no deben excluir lo que ya usaba la versión anterior.
+        usadas_en_formato = ({h for p in ya if p["formato"] == formato for h in p["historias"]}
+                             if formato == "linkedin" else set())
         filas = historias.listar(conn, desde=desde, estados=("nueva", "destacada", "usada"), orden=orden, limite=limite * 2)
         candidatas = [_historia_para_redactor(conn, f["id"]) for f in filas if f["id"] not in usadas_en_formato][:limite]
 

@@ -46,7 +46,7 @@ uv run tn redactor guardar --formato linkedin --titulo 'PostgreSQL 19 y el fin d
 
 ### `resumen`: guion del Resumen semanal (8–12 min)
 
-Elige **6–8 Historias** de las candidatas. Van primero las destacadas y después las de más Peso semanal. Ordénalas con ritmo: la más fuerte primero, y alterna temas (no tres de IA seguidas). Estructura:
+Elige **6–8 Historias** de las candidatas. **Todas las Historias en estado `destacada` entran obligatoriamente, cada una con su propio bloque** (aunque sean más de 8; puedes agrupar dos destacadas del mismo tema en un bloque si lo dices en el título del bloque). Si quedan huecos, rellénalos con las de más Peso semanal. Ordénalas con ritmo: la más fuerte primero, y alterna temas (no tres de IA seguidas). Estructura:
 
 ```markdown
 # <título del vídeo>
@@ -79,6 +79,8 @@ Elige **6–8 Historias** de las candidatas. Van primero las destacadas y despu�
 ```
 
 ### `linkedin`: 3 Posts de LinkedIn
+
+Prioriza las Historias `destacada` que no tengan post todavía.
 
 Escribe **3 posts** (tres comandos `guardar`), cada uno sobre una Historia distinta de las candidatas, que no esté ya usada en LinkedIn esta semana. Mezcla los ángulos: uno práctico ("qué hacer"), uno de análisis ("por qué pasa y hacia dónde va") y uno de opinión. El contenido es **el texto del post tal cual se publica**, siguiendo `voz.md` (1.200–1.800 caracteres, 3 hashtags al final). El enlace va en `--enlace`, nunca dentro del post.
 
