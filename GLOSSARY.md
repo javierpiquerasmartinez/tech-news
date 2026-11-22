@@ -97,3 +97,34 @@ _Avoid_: Idea, borrador, pieza
 **Formato**:
 El tipo de pieza que se propone: Resumen semanal (vídeo), Vídeo didáctico, Vídeo bomba o Post de LinkedIn.
 _Avoid_: Tipo de contenido, plantilla
+
+### Montaje
+
+**Grabación**:
+El vídeo en bruto que graba la persona editora leyendo un guion aprobado, de un tirón, con sus repeticiones y silencios.
+_Avoid_: Raw, metraje, footage
+
+**Toma**:
+Cada intento de decir una misma frase del guion dentro de una Grabación. El Montador se queda con la mejor y descarta el resto.
+_Avoid_: Repetición, retake
+
+**Corte**:
+La lista de tramos de la Grabación que sobreviven al montaje, en orden.
+_Avoid_: EDL, rough cut
+
+**Gráfico**:
+Una pieza visual que se superpone a la Grabación: cabecera de bloque, rótulo de dato, infografía animada o captura de fuente.
+_Avoid_: Overlay, motion graphic, visual
+
+**Montaje**:
+El resultado del Montador para un guion: un proyecto de CapCut con el Corte y los Gráficos colocados, listo para retocar y exportar.
+_Avoid_: Edición, draft, proyecto
+
+**Guía de estilo de edición**:
+El criterio visual del canal (paleta, tipografía, ritmo, cuándo usar cada Gráfico) con el que trabaja el Montador. La mantiene la persona editora; el Montador solo propone cambios.
+_Avoid_: Brand kit, preset
+
+**Ficha de feedback**:
+Las notas de la persona editora sobre un Montaje concreto, con el minuto al que se refiere cada una.
+_Avoid_: Comentarios, review
+

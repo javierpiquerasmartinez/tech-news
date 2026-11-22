@@ -13,7 +13,7 @@ Cada día el sistema recoge lo publicado en ~25 Fuentes, lo agrupa en Historias 
 | Fase | Qué cubre | Estado |
 |---|---|---|
 | **1** | Recoger → Historias → Propuestas (guiones, posts) + interfaz web + avisos | Por construir |
-| **2** | Montaje del vídeo: el Montador convierte guion + tu grabación en vídeo editado | Por diseñar (ver §9) |
+| **2** | Montaje del vídeo: el Montador convierte guion + tu Grabación en un Montaje de CapCut | Diseñado (§9), por construir |
 | **3** | Creación del canal de YouTube (nombre, identidad, configuración) | Pendiente |
 
 ## 2. Mapa de entradas
@@ -233,13 +233,30 @@ tech-news/
 
 Dos capas ([ADR-0003](adr/0003-dos-capas-de-datos.md)): la **máquina** (SQLite, fuera de git, copia diaria comprimida) y la **humana** (Markdown en `semanas/`, también fuera de git porque el repo es público; entra en la misma copia diaria). Cada Propuesta lleva en su cabecera `estado` y las Historias en que se basa.
 
-## 9. Fase 2: el Montador (por diseñar)
+## 9. Fase 2: el Montador
 
-Sí entra en el alcance: el sistema cubrirá desde la noticia hasta el vídeo editado. Idea de partida, a concretar en su propia sesión de diseño:
-- Entrada: guion aprobado del Resumen semanal (ya trae sugerencias visuales por bloque) + tu grabación (cámara o voz en off).
-- El Montador genera secuencias visuales en HTML (titulares, capturas, gráficos, código) sincronizadas con el guion y las renderiza a vídeo; Gemini (AI Studio) para lo que haga falta (imágenes, voz sintética si no grabas).
-- Salida: vídeo editado + miniatura + título y descripción para YouTube.
-- Decisiones abiertas: herramienta de render, cómo sincronizar con tu audio, qué se automatiza y qué retocas tú, Shorts verticales.
+Convierte un guion **aprobado** y tu Grabación en un Montaje de CapCut con el Corte y los Gráficos colocados, listo para retocar y exportar. Se lanza **a mano** (`tn montar --semana <fecha>`), nunca por horario: gasta bastante cuota. Decisión de herramienta: [ADR-0005](adr/0005-montaje-en-capcut-con-capcut-kit-externo.md). Criterio visual: [estilo-edicion.md](../estilo-edicion.md).
+
+```mermaid
+flowchart LR
+  G["Grabación de un tirón<br/>~/Movies/jpdev/&lt;semana&gt;/grabacion.mp4"] --> A["1. Preparar<br/>audio limpio, −14 LUFS"]
+  A --> T["2. Transcribir<br/>mlx-whisper, palabra a palabra"]
+  T --> C["3. Cortar (agente)<br/>mejor Toma por frase, fuera silencios<br/>→ Corte + bloques en el tiempo"]
+  GU["Guion aprobado<br/>(líneas Visual)"] --> C
+  C --> GR["4. Gráficos (agente)<br/>HTML → HyperFrames → .mov con alfa<br/>+ capturas de fuente"]
+  E["estilo-edicion.md"] --> GR
+  GR --> EN["5. Ensamblar<br/>capcut-kit: Corte + Gráficos + música + efectos"]
+  EN --> R["6. Revisar<br/>vista previa + capturas de control → Telegram"]
+  R --> F["Ficha de feedback"]
+  F -- "v2, v3… (antes de retocar a mano)" --> C
+  F --> ER["tn estilo revisar<br/>propone cambios a la guía"]
+```
+
+- **Grabación:** de un tirón; si te equivocas, pausa de 2 s y repite la frase. El Montador se queda con la última Toma buena.
+- **Gráficos:** cabecera de bloque, rótulo de dato, infografía animada y captura de fuente (ver la guía). Imágenes generadas con Gemini solo si no hay nada real que enseñar.
+- **Música y efectos:** de la Biblioteca de audio de YouTube, en `~/Movies/jpdev/audio/musica/` y `~/Movies/jpdev/audio/efectos/`.
+- **Iteración:** v1 → tu feedback (con minuto) → v2… Una vez retocado a mano en CapCut, el Montador solo **añade**.
+- **Requisitos:** CapCut instalado en este Mac, `~/git/jpdev/capcut-kit` clonado con sus `capcut-templates/`, ffmpeg y node.
 
 ## 10. Hoja de ruta (fase 1)
 
