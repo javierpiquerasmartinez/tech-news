@@ -19,7 +19,9 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from tn import config, db, historias
+import markdown as md
+
+from tn import config, db, historias, propuestas
 from tn.fuentes import cargar_fuentes
 
 AQUI = Path(__file__).parent
@@ -203,6 +205,83 @@ def separar(request: Request, hid: int, items: list[int] = Form([]), titulo: str
     return _recargar()
 
 
+# --- Propuestas ---------------------------------------------------------------------
+
+
+def _html(cuerpo: str) -> str:
+    # El texto lo escribe un agente a partir de contenido web: sin HTML crudo.
+    return md.markdown(cuerpo.replace("<", "&lt;"), extensions=["sane_lists"])
+
+
+def _tarjeta_propuesta(request: Request, ruta: Path, error: str | None = None, editando: bool = False) -> HTMLResponse:
+    p = propuestas.leer(ruta)
+    return plantillas.TemplateResponse(
+        request, "_propuesta.html",
+        {"p": p, "html": _html(p.cuerpo), "error": error, "editando": editando,
+         "formatos": propuestas.FORMATOS, "siguientes": propuestas.TRANSICIONES[p.estado]},
+    )
+
+
+def _ruta_propuesta(fichero: str) -> Path:
+    try:
+        return propuestas.resolver(fichero)
+    except propuestas.PropuestaInvalida:
+        raise HTTPException(404) from None
+
+
+@app.get("/propuestas", response_class=HTMLResponse)
+def pagina_propuestas(request: Request, semana: str | None = None):
+    try:
+        inicio = propuestas.inicio_semana(datetime.fromisoformat(semana).date()) if semana else propuestas.semana_por_defecto()
+    except ValueError:
+        inicio = propuestas.semana_por_defecto()
+    lista = propuestas.listar(inicio)
+    with conexion() as conn:
+        cabecera = _cabecera(conn)
+    semanas = sorted({p.parent.name for p in (config.raiz() / "semanas").glob("*/")} | {inicio.isoformat()}, reverse=True)
+    tarjetas = [{"p": p, "html": _html(p.cuerpo),
+                 "siguientes": propuestas.TRANSICIONES[p.estado]} for p in lista]
+    return plantillas.TemplateResponse(
+        request, "propuestas.html",
+        {"tarjetas": tarjetas, "inicio": inicio, "fin": inicio + timedelta(days=6), "semanas": semanas,
+         "formatos": propuestas.FORMATOS, "seccion": "propuestas", **cabecera},
+    )
+
+
+@app.get("/propuesta", response_class=HTMLResponse)
+def propuesta(request: Request, f: str, editar: bool = False):
+    return _tarjeta_propuesta(request, _ruta_propuesta(f), editando=editar)
+
+
+@app.post("/propuesta/estado", response_class=HTMLResponse)
+def propuesta_estado(request: Request, f: str = Form(...), estado: str = Form(...)):
+    ruta = _ruta_propuesta(f)
+    try:
+        propuestas.cambiar_estado(ruta, estado, ORIGEN)
+    except propuestas.PropuestaInvalida as e:
+        return _tarjeta_propuesta(request, ruta, str(e))
+    return _tarjeta_propuesta(request, ruta)
+
+
+@app.post("/propuesta/editar", response_class=HTMLResponse)
+def propuesta_editar(request: Request, f: str = Form(...), cuerpo: str = Form(...)):
+    ruta = _ruta_propuesta(f)
+    try:
+        propuestas.editar(ruta, cuerpo)
+    except propuestas.PropuestaInvalida as e:
+        return _tarjeta_propuesta(request, ruta, str(e), editando=True)
+    return _tarjeta_propuesta(request, ruta)
+
+
+@app.post("/lanzar-redactor")
+def lanzar_redactor(formato: str = Form(...)):
+    """Lanza `tn redactar --<formato> --origen web` en segundo plano."""
+    banderas = {"resumen": "--resumen", "linkedin": "--linkedin", "didactico": "--didactico"}
+    if formato not in banderas:
+        raise HTTPException(404)
+    return _lanzar_proceso(["redactar", banderas[formato]], f"redactar-{formato}")
+
+
 # --- Fuentes -----------------------------------------------------------------------
 
 
@@ -257,20 +336,24 @@ def detalle_ejecucion(request: Request, eid: int):
     return plantillas.TemplateResponse(request, "_ejecucion.html", {"e": cab, "fuentes": filas})
 
 
-@app.post("/lanzar/{accion}")
-def lanzar(accion: str):
-    """Lanza `tn <accion> --origen web` en segundo plano; su progreso se ve en Ejecuciones."""
-    if accion not in ACCIONES_LANZABLES:
-        raise HTTPException(404)
+def _lanzar_proceso(argumentos: list[str], etiqueta: str):
     with conexion() as conn:
         if db.ejecuciones_en_curso(conn):
             return RedirectResponse("/ejecuciones?lanzada=ocupado", status_code=303)
     registros = config.ruta_db().parent / "registros"
     registros.mkdir(parents=True, exist_ok=True)
-    salida = registros / f"{db.ahora().strftime('%Y%m%dT%H%M%S')}-{accion}.log"
+    salida = registros / f"{db.ahora().strftime('%Y%m%dT%H%M%S')}-{etiqueta}.log"
     with salida.open("w") as f:
         subprocess.Popen(
-            ["uv", "run", "tn", *ACCIONES_LANZABLES[accion], "--origen", ORIGEN],
+            ["uv", "run", "tn", *argumentos, "--origen", ORIGEN],
             cwd=config.raiz(), stdout=f, stderr=subprocess.STDOUT, start_new_session=True,
         )
-    return RedirectResponse(f"/ejecuciones?lanzada={accion}", status_code=303)
+    return RedirectResponse(f"/ejecuciones?lanzada={etiqueta}", status_code=303)
+
+
+@app.post("/lanzar/{accion}")
+def lanzar(accion: str):
+    """Lanza `tn <accion> --origen web` en segundo plano; su progreso se ve en Ejecuciones."""
+    if accion not in ACCIONES_LANZABLES:
+        raise HTTPException(404)
+    return _lanzar_proceso(ACCIONES_LANZABLES[accion], accion)

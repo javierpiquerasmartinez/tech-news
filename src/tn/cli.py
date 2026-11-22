@@ -11,7 +11,7 @@ from typing import Annotated
 
 import typer
 
-from tn import agentes, config, db, historias
+from tn import agentes, config, db, historias, propuestas
 from tn.fuentes import cargar_fuentes
 from tn.http import Http
 from tn.modelo import ORIGENES, ItemRecogido
@@ -459,8 +459,164 @@ def cmd_diario(origen: OpcionOrigen = "manual") -> None:
         conn.close()
     for b in bombas:
         typer.secho(f"💥 Historia bomba #{b['id']}: {b['titulo']}", fg=typer.colors.MAGENTA, bold=True)
+    # Historia bomba → Vídeo bomba + post exprés sin esperar al calendario (docs/arnes.md §4.3).
+    conn = _conn()
+    try:
+        sin_propuesta = propuestas.bombas_sin_propuesta(conn)
+    finally:
+        conn.close()
+    for hid in sin_propuesta:
+        _lanzar_agente("redactor", f"Formato: bomba. Historia: {hid}.", origen)
     if editar.estado != "ok" or explorar.estado != "ok":
         raise typer.Exit(1)
+
+
+# --- Redactor y Propuestas -------------------------------------------------------
+
+redactor_app = typer.Typer(help="Entrada y salida del Redactor: contexto y entrega de Propuestas.", no_args_is_help=True)
+app.add_typer(redactor_app, name="redactor")
+
+OpcionSemana = Annotated[str | None, typer.Option(help="Cualquier día de la Semana editorial (AAAA-MM-DD). Por defecto, la actual.")]
+
+
+def _semana(texto: str | None):
+    if not texto:
+        return None
+    try:
+        return propuestas.inicio_semana(date.fromisoformat(texto))
+    except ValueError:
+        raise typer.BadParameter("--semana debe ser AAAA-MM-DD") from None
+
+
+@redactor_app.command("contexto")
+def cmd_redactor_contexto(
+    formato: Annotated[str, typer.Option(help=f"{' | '.join(propuestas.FORMATOS)}")],
+    historia: Annotated[int | None, typer.Option(help="Para didactico y bomba.")] = None,
+    semana: OpcionSemana = None,
+) -> None:
+    """JSON con las Historias candidatas y las Propuestas ya escritas esta semana."""
+    conn = _conn()
+    try:
+        _json(propuestas.contexto(conn, formato, semana=_semana(semana), historia_id=historia), compacto=True)
+    except (propuestas.PropuestaInvalida, historias.AccionInvalida) as e:
+        _fallar(e)
+    finally:
+        conn.close()
+
+
+@redactor_app.command("guardar")
+def cmd_redactor_guardar(
+    formato: Annotated[str, typer.Option()],
+    titulo: Annotated[str, typer.Option()],
+    historias_: Annotated[str, typer.Option("--historias", help="Ids separados por comas.")],
+    contenido: Annotated[str | None, typer.Option(help="Markdown de la Propuesta.")] = None,
+    desde: Annotated[str | None, typer.Option(help="Leer el Markdown de un borrador en data/borradores/ (se borra al guardar).")] = None,
+    enlace: Annotated[str | None, typer.Option(help="LinkedIn: enlace para el primer comentario.")] = None,
+    semana: OpcionSemana = None,
+) -> None:
+    """Guarda una Propuesta en semanas/<viernes>/ con estado `propuesta`."""
+    try:
+        ids = [int(x) for x in historias_.split(",") if x.strip()]
+    except ValueError:
+        _fallar(propuestas.PropuestaInvalida("--historias debe ser una lista de números separados por comas"))
+    borrador = None
+    if desde:
+        base = (config.ruta_db().parent / "borradores").resolve()
+        borrador = (config.raiz() / desde).resolve()
+        if base not in borrador.parents or not borrador.is_file():
+            _fallar(propuestas.PropuestaInvalida(f"El borrador debe ser un fichero dentro de data/borradores/ ({desde})"))
+        contenido = borrador.read_text(encoding="utf-8")
+    if not contenido:
+        _fallar(propuestas.PropuestaInvalida("Indica --desde (borrador) o --contenido"))
+    conn = _conn()
+    try:
+        p = propuestas.guardar(conn, formato, titulo, contenido, ids, semana=_semana(semana), enlace=enlace)
+    except propuestas.PropuestaInvalida as e:
+        _fallar(e)
+    finally:
+        conn.close()
+    if borrador:
+        borrador.unlink()
+    typer.echo(f"Guardada: {p.relativa}")
+
+
+def _redactar(formato: str, instrucciones: str, origen: str) -> None:
+    if _lanzar_agente("redactor", f"Formato: {formato}. {instrucciones}".strip(), origen).estado != "ok":
+        raise typer.Exit(1)
+
+
+@app.command("redactar")
+def cmd_redactar(
+    resumen: Annotated[bool, typer.Option("--resumen", help="Guion del Resumen semanal.")] = False,
+    linkedin: Annotated[bool, typer.Option("--linkedin", help="3 Posts de LinkedIn.")] = False,
+    didactico: Annotated[bool, typer.Option("--didactico", help="3 ideas de Vídeo didáctico.")] = False,
+    semana: OpcionSemana = None,
+    origen: OpcionOrigen = "manual",
+) -> None:
+    """Redactor: escribe las Propuestas de la Semana editorial."""
+    formatos = [f for f, si in (("resumen", resumen), ("ideas-didacticas", didactico), ("linkedin", linkedin)) if si]
+    if not formatos:
+        raise typer.BadParameter("Indica --resumen, --linkedin y/o --didactico")
+    extra = f"Semana editorial: la que contiene {semana} (pasa --semana {semana} a contexto y guardar)." if semana else ""
+    for f in formatos:
+        _redactar(f, extra, origen)
+
+
+propuesta_app = typer.Typer(help="Pedir, ver y aprobar Propuestas.", no_args_is_help=True)
+app.add_typer(propuesta_app, name="propuesta")
+
+
+@propuesta_app.command("pedir")
+def cmd_propuesta_pedir(
+    historia: int,
+    formato: Annotated[str, typer.Option(help="linkedin | bomba | didactico")],
+    origen: OpcionOrigen = "manual",
+) -> None:
+    """Propuesta fuera de calendario para una Historia concreta."""
+    if formato not in ("linkedin", "bomba", "didactico"):
+        raise typer.BadParameter("formato debe ser linkedin, bomba o didactico")
+    if formato == "linkedin":
+        _redactar("linkedin", f"Esta vez escribe UN solo post, sobre la Historia {historia}.", origen)
+    else:
+        _redactar(formato, f"Historia: {historia}.", origen)
+
+
+@app.command("propuestas")
+def cmd_propuestas(
+    semana: OpcionSemana = None,
+    todas: Annotated[bool, typer.Option("--todas", help="Todas las semanas.")] = False,
+) -> None:
+    """Propuestas de la Semana editorial con su estado."""
+    lista = propuestas.listar(None if todas else (_semana(semana) or propuestas.semana_por_defecto()))
+    if not lista:
+        typer.echo("No hay Propuestas. Lanza `tn redactar --resumen --linkedin --didactico`.")
+        return
+    for p in lista:
+        hist = ",".join(str(h) for h in p.meta.get("historias", []))
+        typer.echo(f"{p.estado:<11} {propuestas.FORMATOS.get(p.meta.get('formato'), '?'):<26} {p.meta.get('titulo', '')}  [#{hist}]\n            {p.relativa}")
+
+
+@propuesta_app.command("ver")
+def cmd_propuesta_ver(fichero: str) -> None:
+    """Muestra una Propuesta."""
+    try:
+        typer.echo(propuestas.resolver(fichero).read_text(encoding="utf-8"))
+    except propuestas.PropuestaInvalida as e:
+        _fallar(e)
+
+
+@propuesta_app.command("estado")
+def cmd_propuesta_estado(
+    fichero: str,
+    estado: Annotated[str, typer.Argument(help="propuesta | aprobada | descartada | publicada")],
+    origen: OpcionOrigenAccion = "manual",
+) -> None:
+    """Aprueba, descarta o marca como publicada una Propuesta."""
+    try:
+        p = propuestas.cambiar_estado(propuestas.resolver(fichero), estado, _validar_origen(origen))
+    except propuestas.PropuestaInvalida as e:
+        _fallar(e)
+    typer.echo(f"{p.relativa}: {p.estado}")
 
 
 @app.command("ui")
