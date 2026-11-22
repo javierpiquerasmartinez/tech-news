@@ -1,0 +1,27 @@
+[project]
+name = "tn"
+version = "0.1.0"
+description = "Arnés editorial de tech-news: recoge Fuentes, agrupa Historias y propone contenido."
+requires-python = ">=3.12"
+dependencies = [
+    "feedparser>=6.0.14",
+    "httpx>=0.28.1",
+    "pyyaml>=6.0.4",
+    "selectolax>=1.0.2",
+    "typer>=0.29.2",
+]
+
+[project.scripts]
+tn = "tn.cli:app"
+
+[build-system]
+requires = ["uv_build>=0.13.9,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

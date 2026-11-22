@@ -1,0 +1,61 @@
+# Catálogo de Fuentes de tech-news (docs/arnes.md §2).
+# Añadir o quitar una Fuente no requiere tocar código.
+#
+# Campos:
+#   id      identificador estable (no cambiar: los Items lo referencian)
+#   nombre  nombre legible
+#   grupo   tldr | rapidas | ia-oficial | dev-cloud | seguridad | profundidad
+#   tipo    rss      → feed RSS/Atom (url)
+#           tldr     → newsletter TLDR (slug); RSS como señal + HTML de cada edición
+#           cisa-kev → JSON de vulnerabilidades explotadas de CISA (url)
+#           explorador → sin feed: la recorre el Explorador, el Recolector la ignora
+#   activa  false para pausarla sin borrarla
+#   nota    opcional, por qué está así
+#
+# Accesos verificados el 2026-11-22: docs/research/fuentes.md
+
+fuentes:
+  # --- TLDR: base diaria curada ------------------------------------------
+  - {id: tldr-tech, nombre: TLDR, grupo: tldr, tipo: tldr, slug: tech}
+  - {id: tldr-ai, nombre: TLDR AI, grupo: tldr, tipo: tldr, slug: ai}
+  - {id: tldr-dev, nombre: TLDR Dev, grupo: tldr, tipo: tldr, slug: dev}
+  - {id: tldr-infosec, nombre: TLDR InfoSec, grupo: tldr, tipo: tldr, slug: infosec}
+  - {id: tldr-devops, nombre: TLDR DevOps, grupo: tldr, tipo: tldr, slug: devops}
+  - {id: tldr-data, nombre: TLDR Data, grupo: tldr, tipo: tldr, slug: data}
+
+  # --- Rápidas: Historias bomba ------------------------------------------
+  - {id: hn, nombre: "Hacker News (≥150 puntos)", grupo: rapidas, tipo: rss, url: "https://hnrss.org/newest?points=150"}
+  - {id: techmeme, nombre: Techmeme, grupo: rapidas, tipo: rss, url: "https://www.techmeme.com/feed.xml"}
+  - {id: simonwillison, nombre: Simon Willison, grupo: rapidas, tipo: rss, url: "https://simonwillison.net/atom/everything/"}
+
+  # --- IA oficial: lanzamientos ------------------------------------------
+  - {id: openai, nombre: OpenAI News, grupo: ia-oficial, tipo: rss, url: "https://openai.com/news/rss.xml"}
+  - {id: google-ai, nombre: Google AI, grupo: ia-oficial, tipo: rss, url: "https://blog.google/technology/ai/rss/"}
+  - {id: deepmind, nombre: Google DeepMind, grupo: ia-oficial, tipo: rss, url: "https://deepmind.google/blog/rss.xml"}
+  - {id: mistral, nombre: Mistral AI, grupo: ia-oficial, tipo: rss, url: "https://mistral.ai/news/rss"}
+  - {id: huggingface, nombre: Hugging Face blog, grupo: ia-oficial, tipo: rss, url: "https://huggingface.co/blog/feed.xml"}
+  - {id: anthropic, nombre: Anthropic News, grupo: ia-oficial, tipo: explorador, url: "https://www.anthropic.com/news", nota: "Sin RSS"}
+  - {id: openai-api-changelog, nombre: OpenAI API changelog, grupo: ia-oficial, tipo: explorador, url: "https://platform.openai.com/docs/changelog", nota: "Sin RSS"}
+  - {id: gemini-api-changelog, nombre: Gemini API changelog, grupo: ia-oficial, tipo: explorador, url: "https://ai.google.dev/gemini-api/docs/changelog", nota: "Sin RSS"}
+
+  # --- Dev / cloud ---------------------------------------------------------
+  - {id: github-blog, nombre: GitHub Blog, grupo: dev-cloud, tipo: rss, url: "https://github.blog/feed/"}
+  - {id: github-changelog, nombre: GitHub Changelog, grupo: dev-cloud, tipo: rss, url: "https://github.blog/changelog/feed/"}
+  - {id: github-trending, nombre: GitHub Trending, grupo: dev-cloud, tipo: explorador, url: "https://github.com/trending", nota: "Sin RSS ni API"}
+  - {id: aws-news, nombre: AWS News Blog, grupo: dev-cloud, tipo: rss, url: "https://aws.amazon.com/blogs/aws/feed/"}
+  - {id: cloudflare, nombre: Cloudflare Blog, grupo: dev-cloud, tipo: rss, url: "https://blog.cloudflare.com/rss/"}
+  - {id: vercel, nombre: Vercel, grupo: dev-cloud, tipo: rss, url: "https://vercel.com/atom"}
+  - {id: kubernetes, nombre: Kubernetes Blog, grupo: dev-cloud, tipo: rss, url: "https://kubernetes.io/feed.xml"}
+  - {id: nodejs, nombre: Node.js Blog, grupo: dev-cloud, tipo: rss, url: "https://nodejs.org/en/feed/blog.xml"}
+
+  # --- Seguridad -------------------------------------------------------------
+  - {id: cisa-kev, nombre: CISA KEV, grupo: seguridad, tipo: cisa-kev, url: "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"}
+  - {id: bleepingcomputer, nombre: BleepingComputer, grupo: seguridad, tipo: rss, url: "https://www.bleepingcomputer.com/feed/"}
+  - {id: risky-bulletin, nombre: Risky Bulletin, grupo: seguridad, tipo: rss, url: "https://news.risky.biz/rss/"}
+  - {id: tldrsec, nombre: "tl;dr sec", grupo: seguridad, tipo: rss, url: "https://rss.hiivinternal.com/feeds/xgTKUmMmUm.xml", activa: false, nota: "Pausada: el host del feed declarado no resuelve (2026-11-22). Buscar feed alternativo o pasarla al Explorador"}
+
+  # --- Profundidad semanal ---------------------------------------------------
+  - {id: the-batch, nombre: The Batch, grupo: profundidad, tipo: rss, url: "https://charonhub.deeplearning.ai/rss/"}
+  - {id: import-ai, nombre: Import AI, grupo: profundidad, tipo: rss, url: "https://importai.substack.com/feed"}
+  - {id: latent-space, nombre: Latent Space, grupo: profundidad, tipo: rss, url: "https://www.latent.space/feed"}
+  - {id: pragmatic-engineer, nombre: The Pragmatic Engineer, grupo: profundidad, tipo: rss, url: "https://newsletter.pragmaticengineer.com/feed"}
