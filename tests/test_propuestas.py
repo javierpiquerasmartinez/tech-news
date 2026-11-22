@@ -59,13 +59,16 @@ def test_guardar_escribe_markdown_con_cabecera_y_marca_usada(conn, tmp_path):
     assert leida.meta["estado"] == "propuesta" and leida.meta["historias"] == [1]
     assert leida.meta["enlace_primer_comentario"] == "https://pg.example"
     assert leida.cuerpo.strip() == "Hola **mundo**"
-    assert historias.ver(conn, 1)[0]["estado"] == "usada"
+    assert historias.ver(conn, 1)[0]["estado"] == "nueva"  # escribirla no la usa
+    propuestas.cambiar_estado(conn, p.ruta, "aprobada", "manual")
+    assert historias.ver(conn, 1)[0]["estado"] == "usada"  # aprobarla sí
     segundo = propuestas.guardar(conn, "linkedin", "Otro", "x", [3])
     assert segundo.ruta.name.startswith("linkedin-2-")
 
 
 def test_ideas_no_marcan_usada_y_formatos_por_historia_exigen_una(conn):
-    propuestas.guardar(conn, "ideas-didacticas", "Ideas", "## Idea 1", [1, 2])
+    ideas = propuestas.guardar(conn, "ideas-didacticas", "Ideas", "## Idea 1", [1, 2])
+    propuestas.cambiar_estado(conn, ideas.ruta, "aprobada", "manual")
     assert historias.ver(conn, 1)[0]["estado"] == "nueva"
     with pytest.raises(propuestas.PropuestaInvalida, match="exactamente una"):
         propuestas.guardar(conn, "bomba", "X", "y", [1, 2])
@@ -77,12 +80,12 @@ def test_estados_y_no_sobrescribir_lo_aprobado(conn):
     p = propuestas.guardar(conn, "resumen", "Resumen", "v1", [1, 2])
     propuestas.guardar(conn, "resumen", "Resumen", "v2", [1, 2])  # mientras es propuesta, se reemplaza
     assert propuestas.leer(p.ruta).cuerpo.strip() == "v2"
-    propuestas.cambiar_estado(p.ruta, "aprobada", "manual")
+    propuestas.cambiar_estado(conn, p.ruta, "aprobada", "manual")
     with pytest.raises(propuestas.PropuestaInvalida, match="aprobada"):
         propuestas.guardar(conn, "resumen", "Resumen", "v3", [1])
-    propuestas.cambiar_estado(p.ruta, "publicada", "web")
+    propuestas.cambiar_estado(conn, p.ruta, "publicada", "web")
     with pytest.raises(propuestas.PropuestaInvalida):
-        propuestas.cambiar_estado(p.ruta, "aprobada", "web")
+        propuestas.cambiar_estado(conn, p.ruta, "aprobada", "web")
     with pytest.raises(propuestas.PropuestaInvalida, match="publicada"):
         propuestas.editar(p.ruta, "cambio")
     assert [h["estado"] for h in propuestas.leer(p.ruta).meta["historial"]] == ["aprobada", "publicada"]
@@ -114,3 +117,9 @@ def test_pantalla_de_propuestas(conn):
     r = cliente.post("/propuesta/editar", data={"f": p.relativa, "cuerpo": "Nuevo texto"})
     assert "Nuevo texto" in r.text
     assert cliente.get("/propuesta", params={"f": "voz.md"}).status_code == 404
+
+
+def test_regenerar_el_resumen_no_excluye_lo_que_ya_usaba(conn):
+    propuestas.guardar(conn, "resumen", "Resumen v1", "v1", [1, 2])
+    ctx = propuestas.contexto(conn, "resumen")
+    assert {1, 2} <= {h["id"] for h in ctx["historias_candidatas"]}

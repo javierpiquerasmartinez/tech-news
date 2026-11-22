@@ -35,7 +35,8 @@ TRANSICIONES = {
 }
 # Formatos que necesitan exactamente una Historia (se piden para una Historia concreta).
 POR_HISTORIA = ("didactico", "bomba")
-# Las ideas no "usan" una Historia: solo el guion que se escribe al aprobar una.
+# Una Historia pasa a `usada` cuando la persona editora aprueba una Propuesta basada en
+# ella, no cuando el Redactor la escribe. Las ideas no "usan" una Historia: solo el guion.
 NO_MARCAN_USADA = ("ideas-didacticas",)
 _CABECERA = re.compile(r"\A---\n(.*?)\n---\n?", re.S)
 
@@ -152,7 +153,10 @@ def contexto(conn: sqlite3.Connection, formato: str, *, semana: date | None = No
             "linkedin": ("peso_semanal", momento - timedelta(days=7), 12),
             "ideas-didacticas": ("valor_didactico", momento - timedelta(days=14), 12),
         }[formato]
-        usadas_en_formato = {h for p in ya if p["formato"] == formato for h in p["historias"]}
+        # Solo LinkedIn acumula varias Propuestas por semana; el resumen y las ideas se
+        # reescriben enteros, así que no deben excluir lo que ya usaba la versión anterior.
+        usadas_en_formato = ({h for p in ya if p["formato"] == formato for h in p["historias"]}
+                             if formato == "linkedin" else set())
         filas = historias.listar(conn, desde=desde, estados=("nueva", "destacada", "usada"), orden=orden, limite=limite * 2)
         candidatas = [_historia_para_redactor(conn, f["id"]) for f in filas if f["id"] not in usadas_en_formato][:limite]
 
@@ -213,18 +217,13 @@ def guardar(conn: sqlite3.Connection, formato: str, titulo: str, contenido: str,
         meta["enlace_primer_comentario"] = enlace
     p = Propuesta(ruta=ruta, meta=meta, cuerpo=contenido)
     _escribir(p)
-    if formato not in NO_MARCAN_USADA:
-        for hid in historia_ids:
-            h, _ = historias.ver(conn, hid)
-            if h["estado"] in ("nueva", "destacada", "usada"):
-                historias.marcar_usada(conn, hid)
     return p
 
 
 # --- Lo que hace la persona editora ---------------------------------------------------
 
 
-def cambiar_estado(ruta: Path, nuevo: str, origen: str) -> Propuesta:
+def cambiar_estado(conn: sqlite3.Connection, ruta: Path, nuevo: str, origen: str) -> Propuesta:
     if nuevo not in ESTADOS:
         raise PropuestaInvalida(f"Estado desconocido: {nuevo}. Usa uno de {', '.join(ESTADOS)}")
     p = leer(ruta)
@@ -233,6 +232,14 @@ def cambiar_estado(ruta: Path, nuevo: str, origen: str) -> Propuesta:
     p.meta["estado"] = nuevo
     p.meta.setdefault("historial", []).append({"estado": nuevo, "origen": origen, "momento": _iso(ahora())})
     _escribir(p)
+    if nuevo in ("aprobada", "publicada") and p.meta.get("formato") not in NO_MARCAN_USADA:
+        for hid in p.meta.get("historias", []):
+            try:
+                h, _ = historias.ver(conn, hid)
+            except historias.AccionInvalida:
+                continue
+            if h["estado"] in ("nueva", "destacada"):
+                historias.marcar_usada(conn, hid)
     return p
 
 

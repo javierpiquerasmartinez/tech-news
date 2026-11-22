@@ -925,10 +925,13 @@ def cmd_propuesta_estado(
     origen: OpcionOrigenAccion = "manual",
 ) -> None:
     """Aprueba, descarta o marca como publicada una Propuesta."""
+    conn = _conn()
     try:
-        p = propuestas.cambiar_estado(propuestas.resolver(fichero), estado, _validar_origen(origen))
+        p = propuestas.cambiar_estado(conn, propuestas.resolver(fichero), estado, _validar_origen(origen))
     except propuestas.PropuestaInvalida as e:
         _fallar(e)
+    finally:
+        conn.close()
     typer.echo(f"{p.relativa}: {p.estado}")
 
 
