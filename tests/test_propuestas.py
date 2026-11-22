@@ -111,6 +111,7 @@ def test_pantalla_de_propuestas(conn):
     cliente = TestClient(app)
     r = cliente.get("/propuestas")
     assert r.status_code == 200 and "Post NGINX" in r.text
+    assert f'<option value="{p.ruta.parent.name}"' in r.text and '<option value="semanas"' not in r.text
     assert "<script>alert" not in r.text and "<strong>fuerte</strong>" in r.text
     r = cliente.post("/propuesta/estado", data={"f": p.relativa, "estado": "aprobada"})
     assert "aprobada" in r.text
@@ -123,3 +124,10 @@ def test_regenerar_el_resumen_no_excluye_lo_que_ya_usaba(conn):
     propuestas.guardar(conn, "resumen", "Resumen v1", "v1", [1, 2])
     ctx = propuestas.contexto(conn, "resumen")
     assert {1, 2} <= {h["id"] for h in ctx["historias_candidatas"]}
+
+
+def test_post_diario_solo_mira_lo_reciente(conn):
+    conn.execute("UPDATE historias SET ultimo_item_en = '2020-01-01T00:00:00+00:00' WHERE id = 2")
+    conn.commit()
+    ids = [h["id"] for h in propuestas.contexto(conn, "linkedin", horas=48)["historias_candidatas"]]
+    assert 2 not in ids and 1 in ids

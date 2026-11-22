@@ -102,10 +102,10 @@ flowchart TD
   J["Jueves 22:00<br/>tn redactar --resumen"] --> RS["Resumen semanal (guion 8–12 min, 6–8 Historias)<br/>+ 3 ideas de Vídeo didáctico"]
   RS --> TV["Viernes 08:00 · Telegram: paquete listo"]
   TV --> GR["Tú revisas, apruebas, grabas<br/>publicas viernes/sábado"]
-  D["Domingo 22:00<br/>tn redactar --linkedin"] --> LI["3 Posts de LinkedIn<br/>(incluye lo del fin de semana)"]
-  LI --> TL["Lunes 08:00 · Telegram: posts listos"]
-  TL --> PU["Publicas martes · miércoles · jueves"]
-  D2["Domingo 22:00<br/>tn perfil revisar"] --> PE["Editor propone diff a perfil-editorial.md<br/>a partir de tus descartes/destacados/correcciones"]
+  P["Lunes, martes y miércoles 16:30<br/>tn redactar --post"] --> PO["1 Post de LinkedIn<br/>(lo más fuerte de las últimas 48 h)"]
+  PO --> TP["Telegram: el post completo"]
+  TP --> PU["Lo publicas a la mañana siguiente"]
+  D2["Domingo 22:45<br/>tn perfil revisar"] --> PE["Editor propone diff a perfil-editorial.md<br/>a partir de tus descartes/destacados/correcciones"]
   PE --> AC["Tú aceptas o rechazas"]
 ```
 
@@ -120,11 +120,10 @@ Seis tareas de `launchd` (LaunchAgents en `~/Library/LaunchAgents/com.jpdev.tech
 | Cuándo | Tarea | Qué hace | Aviso |
 |---|---|---|---|
 | Diario 16:00 | `diario` | Recolector → Editor (máx. 200 Items, `TN_MAX_ITEMS_DIARIO`) → Explorador → Editor → Vídeo bomba si procede → copia de seguridad | 💥 al momento si hay Historia bomba |
+| Lunes, martes y miércoles 16:30 | `post-diario` | `tn redactar --post`: un post sobre lo más fuerte de las **últimas 48 h** sin post esta semana | ✍️ El post completo, para publicarlo a la mañana siguiente |
 | Jueves 22:00 | `resumen` | `tn redactar --resumen --didactico` | — |
 | Viernes 08:00 | `aviso-paquete` | — | 📦 Resumen semanal e ideas listos, con el gancho |
-| Domingo 22:00 | `linkedin` | `tn redactar --linkedin` | — |
-| Domingo 22:45 | `perfil` | `tn perfil revisar` (solo si hay ≥ 3 correcciones nuevas) | — |
-| Lunes 08:00 | `aviso-posts` | — | ✍️ Los 3 posts, uno por mensaje, para copiarlos desde el móvil |
+| Domingo 22:45 | `perfil` | `tn perfil revisar` (solo si hay ≥ 3 correcciones nuevas) | 🧭 si hay propuesta de cambios |
 
 Gestión: `tn horarios instalar | desinstalar | estado | lanzar <tarea>` y `tn diagnostico [--claude]`.
 
@@ -189,7 +188,7 @@ Toda acción pasa por la CLI `tn` ([ADR-0004](adr/0004-cli-unica-como-punto-de-e
 | Corregir una puntuación | `tn historia puntuar <id> --didactico 8` | "esto da para vídeo didáctico" | Editar puntuación |
 | Fusionar / separar | `tn historia fusionar <a> <b>` · `tn historia separar <id> --items 3,4 --titulo …` | "estas dos son la misma" | Fusionar / Separar |
 | Propuesta fuera de calendario | `tn propuesta pedir <id> --formato …` | "hazme un post de esto ya" | Pedir Propuesta |
-| Generar el paquete semanal antes | `tn redactar --resumen` | `/redactar` | Ejecuciones |
+| Generar el paquete semanal o un post antes | `tn redactar --resumen` · `tn redactar --post` | `/redactar` | Ejecuciones |
 | Ver / aprobar / descartar una Propuesta | `tn propuestas` · `tn propuesta ver <fichero>` · `tn propuesta estado <fichero> aprobada` | "apruebo el post 2" | Propuestas |
 | Revisar la semana con criterio | — | `/revisar-semana` | — |
 | Afinar el Perfil editorial | `tn perfil revisar` · `tn perfil diff` · `tn perfil aceptar`/`rechazar` | "esta semana sobraba cripto" | — |

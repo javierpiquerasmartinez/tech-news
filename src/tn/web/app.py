@@ -238,7 +238,7 @@ def pagina_propuestas(request: Request, semana: str | None = None):
     lista = propuestas.listar(inicio)
     with conexion() as conn:
         cabecera = _cabecera(conn)
-    semanas = sorted({p.parent.name for p in (config.raiz() / "semanas").glob("*/")} | {inicio.isoformat()}, reverse=True)
+    semanas = sorted({p.name for p in (config.raiz() / "semanas").glob("*/") if p.is_dir()} | {inicio.isoformat()}, reverse=True)
     tarjetas = [{"p": p, "html": _html(p.cuerpo),
                  "siguientes": propuestas.TRANSICIONES[p.estado]} for p in lista]
     return plantillas.TemplateResponse(
@@ -277,7 +277,7 @@ def propuesta_editar(request: Request, f: str = Form(...), cuerpo: str = Form(..
 @app.post("/lanzar-redactor")
 def lanzar_redactor(formato: str = Form(...)):
     """Lanza `tn redactar --<formato> --origen web` en segundo plano."""
-    banderas = {"resumen": "--resumen", "linkedin": "--linkedin", "didactico": "--didactico"}
+    banderas = {"resumen": "--resumen", "post": "--post", "linkedin": "--linkedin", "didactico": "--didactico"}
     if formato not in banderas:
         raise HTTPException(404)
     return _lanzar_proceso(["redactar", banderas[formato]], f"redactar-{formato}")
