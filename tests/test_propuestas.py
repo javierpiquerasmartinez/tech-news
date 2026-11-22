@@ -8,6 +8,9 @@ from tn.modelo import ItemRecogido
 from tn.prefiltro import prefiltrar
 
 
+VER = "\n\n## Verificación\n\n| Dato | Fuentes | Estado |\n|---|---|---|\n| Un dato | https://oficial.example/x | ✅ oficial |\n"
+
+
 def _p(u=5, d=5, s=5):
     return {"urgencia": u, "just_urgencia": "j", "valor_didactico": d, "just_didactico": "j",
             "peso_semanal": s, "just_peso": "j"}
@@ -45,14 +48,14 @@ def test_contexto_ordena_por_peso_y_no_repite_en_linkedin(conn):
     ctx = propuestas.contexto(conn, "linkedin")
     assert [h["titulo"] for h in ctx["historias_candidatas"]][:2] == ["RCE en NGINX", "PostgreSQL 19"]
     assert ctx["historias_candidatas"][0]["items"][0]["url"] == "https://x.example/2"
-    propuestas.guardar(conn, "linkedin", "Post NGINX", "Texto del post", [2], enlace="https://x.example/2")
+    propuestas.guardar(conn, "linkedin", "Post NGINX", "Texto del post" + VER, [2], enlace="https://x.example/2")
     ctx = propuestas.contexto(conn, "linkedin")
     assert "RCE en NGINX" not in [h["titulo"] for h in ctx["historias_candidatas"]]
     assert ctx["propuestas_ya_escritas_esta_semana"][0]["titulo"] == "Post NGINX"
 
 
 def test_guardar_escribe_markdown_con_cabecera_y_marca_usada(conn, tmp_path):
-    p = propuestas.guardar(conn, "linkedin", "PostgreSQL 19 llega", "Hola **mundo**", [1], enlace="https://pg.example")
+    p = propuestas.guardar(conn, "linkedin", "PostgreSQL 19 llega", "Hola **mundo**" + VER, [1], enlace="https://pg.example")
     assert p.ruta.parent.parent == tmp_path / "semanas"
     assert p.ruta.name.startswith("linkedin-1-postgresql-19-llega")
     leida = propuestas.leer(p.ruta)
@@ -62,7 +65,7 @@ def test_guardar_escribe_markdown_con_cabecera_y_marca_usada(conn, tmp_path):
     assert historias.ver(conn, 1)[0]["estado"] == "nueva"  # escribirla no la usa
     propuestas.cambiar_estado(conn, p.ruta, "aprobada", "manual")
     assert historias.ver(conn, 1)[0]["estado"] == "usada"  # aprobarla sí
-    segundo = propuestas.guardar(conn, "linkedin", "Otro", "x", [3])
+    segundo = propuestas.guardar(conn, "linkedin", "Otro", "x" + VER, [3])
     assert segundo.ruta.name.startswith("linkedin-2-")
 
 
@@ -71,18 +74,18 @@ def test_ideas_no_marcan_usada_y_formatos_por_historia_exigen_una(conn):
     propuestas.cambiar_estado(conn, ideas.ruta, "aprobada", "manual")
     assert historias.ver(conn, 1)[0]["estado"] == "nueva"
     with pytest.raises(propuestas.PropuestaInvalida, match="exactamente una"):
-        propuestas.guardar(conn, "bomba", "X", "y", [1, 2])
+        propuestas.guardar(conn, "bomba", "X", "y" + VER, [1, 2])
     with pytest.raises(propuestas.PropuestaInvalida, match="--historia"):
         propuestas.contexto(conn, "didactico")
 
 
 def test_estados_y_no_sobrescribir_lo_aprobado(conn):
-    p = propuestas.guardar(conn, "resumen", "Resumen", "v1", [1, 2])
-    propuestas.guardar(conn, "resumen", "Resumen", "v2", [1, 2])  # mientras es propuesta, se reemplaza
+    p = propuestas.guardar(conn, "resumen", "Resumen", "v1" + VER, [1, 2])
+    propuestas.guardar(conn, "resumen", "Resumen", "v2" + VER, [1, 2])  # mientras es propuesta, se reemplaza
     assert propuestas.leer(p.ruta).cuerpo.strip() == "v2"
     propuestas.cambiar_estado(conn, p.ruta, "aprobada", "manual")
     with pytest.raises(propuestas.PropuestaInvalida, match="aprobada"):
-        propuestas.guardar(conn, "resumen", "Resumen", "v3", [1])
+        propuestas.guardar(conn, "resumen", "Resumen", "v3" + VER, [1])
     propuestas.cambiar_estado(conn, p.ruta, "publicada", "web")
     with pytest.raises(propuestas.PropuestaInvalida):
         propuestas.cambiar_estado(conn, p.ruta, "aprobada", "web")
@@ -93,7 +96,7 @@ def test_estados_y_no_sobrescribir_lo_aprobado(conn):
 
 def test_bombas_sin_propuesta(conn):
     assert propuestas.bombas_sin_propuesta(conn) == [2]
-    propuestas.guardar(conn, "bomba", "RCE en NGINX", "Short", [2])
+    propuestas.guardar(conn, "bomba", "RCE en NGINX", "Short" + VER, [2])
     assert propuestas.bombas_sin_propuesta(conn) == []
 
 
@@ -106,7 +109,7 @@ def test_resolver_no_sale_de_semanas(conn, tmp_path):
 
 
 def test_pantalla_de_propuestas(conn):
-    p = propuestas.guardar(conn, "linkedin", "Post NGINX", "Texto <script>alert(1)</script> **fuerte**", [2])
+    p = propuestas.guardar(conn, "linkedin", "Post NGINX", "Texto <script>alert(1)</script> **fuerte**" + VER, [2])
     from tn.web.app import app
     cliente = TestClient(app)
     r = cliente.get("/propuestas")
@@ -121,7 +124,7 @@ def test_pantalla_de_propuestas(conn):
 
 
 def test_regenerar_el_resumen_no_excluye_lo_que_ya_usaba(conn):
-    propuestas.guardar(conn, "resumen", "Resumen v1", "v1", [1, 2])
+    propuestas.guardar(conn, "resumen", "Resumen v1", "v1" + VER, [1, 2])
     ctx = propuestas.contexto(conn, "resumen")
     assert {1, 2} <= {h["id"] for h in ctx["historias_candidatas"]}
 
@@ -134,7 +137,7 @@ def test_post_diario_solo_mira_lo_reciente(conn):
 
 
 def test_la_ficha_de_feedback_no_es_una_propuesta(conn, tmp_path):
-    p = propuestas.guardar(conn, "resumen", "Resumen", "v1", [1])
+    p = propuestas.guardar(conn, "resumen", "Resumen", "v1" + VER, [1])
     (p.ruta.parent / "montaje-feedback.md").write_text("# Ficha\n\n- v1 · 00:10 · algo · 2026-11-22\n")
     assert [x.ruta.name for x in propuestas.listar(propuestas.inicio_semana(date.today()))] == ["resumen-semanal.md"]
 
@@ -162,3 +165,28 @@ def test_listas_y_etiquetas_pegadas_se_separan():
     from tn.web.app import _html
     html = _html("**Entrada · literal:** Hola.\n- punto uno\n- punto dos\n**Fuentes:** https://x.example\n")
     assert html.count("<li>") == 2 and "<p><strong>Fuentes:</strong>" in html
+
+
+def test_sin_verificacion_o_mal_hecha_se_rechaza(conn):
+    with pytest.raises(propuestas.PropuestaInvalida, match="Falta la sección"):
+        propuestas.guardar(conn, "linkedin", "Post", "Texto con un dato", [1])
+    with pytest.raises(propuestas.PropuestaInvalida, match="sin la URL"):
+        propuestas.guardar(conn, "linkedin", "Post", "Texto\n\n## Verificación\n| Dato | Fuentes | Estado |\n|---|---|---|\n| X | solo TLDR | ✅ oficial |\n", [1])
+    with pytest.raises(propuestas.PropuestaInvalida, match="no válido"):
+        propuestas.guardar(conn, "linkedin", "Post", "Texto\n\n## Verificación\n| Dato | Fuentes | Estado |\n|---|---|---|\n| X | https://a | creo que sí |\n", [1])
+
+
+def test_la_verificacion_se_guarda_aparte_y_no_se_publica(conn):
+    p = propuestas.guardar(conn, "linkedin", "Post", "Texto del post." + VER, [1])
+    leida = propuestas.leer(p.ruta)
+    assert "Verificación" not in leida.cuerpo and leida.cuerpo.strip() == "Texto del post."
+    assert "https://oficial.example/x" in leida.meta["verificacion"]
+    # las ideas didácticas no la necesitan
+    propuestas.guardar(conn, "ideas-didacticas", "Ideas", "## Idea 1", [1])
+
+
+def test_la_web_muestra_la_verificacion(conn):
+    propuestas.guardar(conn, "linkedin", "Post", "Texto." + VER, [1])
+    from tn.web.app import app
+    r = TestClient(app).get("/propuestas")
+    assert "Verificación · 1 datos" in r.text and "<table>" in r.text

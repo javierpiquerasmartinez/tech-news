@@ -263,16 +263,24 @@ def _separar_lineas(cuerpo: str) -> str:
 def _html(cuerpo: str) -> str:
     # El texto lo escribe un agente a partir de contenido web: sin HTML crudo.
     texto = _separar_lineas(_graficos_legibles(cuerpo)).replace("<", "&lt;")
-    return md.markdown(texto, extensions=["sane_lists", "fenced_code"])
+    return md.markdown(texto, extensions=["sane_lists", "fenced_code", "tables"])
 
 
 def _tarjeta_propuesta(request: Request, ruta: Path, error: str | None = None, editando: bool = False) -> HTMLResponse:
     p = propuestas.leer(ruta)
     return plantillas.TemplateResponse(
         request, "_propuesta.html",
-        {"p": p, "html": _html(p.cuerpo), "error": error, "editando": editando,
+        {"p": p, "html": _html(p.cuerpo), "error": error, "editando": editando, **_verificacion(p),
          "formatos": propuestas.FORMATOS, "siguientes": propuestas.TRANSICIONES[p.estado]},
     )
+
+
+def _verificacion(p) -> dict:
+    tabla = p.meta.get("verificacion") or ""
+    if not tabla:
+        return {"verif_html": "", "verif_total": 0, "verif_fuera": 0}
+    filas = [l for l in tabla.splitlines() if l.strip().startswith("|") and "---" not in l][1:]
+    return {"verif_html": _html(tabla), "verif_total": len(filas), "verif_fuera": sum("❌" in l for l in filas)}
 
 
 def _ruta_propuesta(fichero: str) -> Path:
@@ -292,7 +300,7 @@ def pagina_propuestas(request: Request, semana: str | None = None):
     with conexion() as conn:
         cabecera = _cabecera(conn)
     semanas = sorted({p.name for p in (config.raiz() / "semanas").glob("*/") if p.is_dir()} | {inicio.isoformat()}, reverse=True)
-    tarjetas = [{"p": p, "html": _html(p.cuerpo),
+    tarjetas = [{"p": p, "html": _html(p.cuerpo), **_verificacion(p),
                  "siguientes": propuestas.TRANSICIONES[p.estado]} for p in lista]
     return plantillas.TemplateResponse(
         request, "propuestas.html",

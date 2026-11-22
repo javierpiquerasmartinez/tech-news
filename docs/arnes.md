@@ -174,6 +174,8 @@ stateDiagram-v2
 
 Las ideas de Vídeo didáctico se proponen como esquema; el guion completo solo se escribe al aprobar una (ahorra cuota).
 
+**Datos contrastados o fuera.** Todo dato de un guion, un post o un Vídeo bomba (cifras, versiones, precios, fechas, CVE, afirmaciones de hecho, citas, y los de los Gráficos) tiene que estar confirmado en la **fuente oficial** o en **dos fuentes independientes de confianza**. Un resumen de newsletter o una sola noticia no bastan; lo que no se contrasta no aparece. Cada Propuesta lleva una sección `## Verificación` (Dato | Fuentes | Estado: ✅ oficial, ✅ 2 fuentes o ❌ fuera). La CLI rechaza guardar sin ella o con un ✅ sin URL, y se guarda aparte (no se publica). En la web aparece bajo cada Propuesta para auditarla.
+
 ## 7. Cómo intervienes tú
 
 Toda acción pasa por la CLI `tn` ([ADR-0004](adr/0004-cli-unica-como-punto-de-entrada.md)). La web y yo (Claude Code) somos clientes de esa CLI: **pedírmelo hablando es exactamente lo mismo que pulsar el botón**, y queda registrado igual.

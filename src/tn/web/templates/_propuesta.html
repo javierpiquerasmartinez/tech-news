@@ -36,5 +36,13 @@
       <summary>Leer</summary>
       <div class="markdown">{{ html|safe }}</div>
     </details>
+    {% if verif_html %}
+      <details class="detalle verificacion">
+        <summary>Verificación · {{ verif_total }} datos{% if verif_fuera %} · {{ verif_fuera }} fuera por no contrastados{% endif %}</summary>
+        <div class="markdown">{{ verif_html|safe }}</div>
+      </details>
+    {% elif p.meta.get('formato') in ('resumen', 'didactico', 'bomba', 'linkedin') %}
+      <p class="error">Sin verificación de datos: escrita antes de exigirla. Regenérala o contrasta los datos a mano.</p>
+    {% endif %}
   {% endif %}
 </article>

@@ -19,17 +19,42 @@ Ejecutas los comandos **exactamente como aparecen aquí**: sin opciones que no e
    `uv run tn redactor contexto --formato FORMATO` (y `--historia ID` si el formato es `didactico` o `bomba`).
    Recibes las Historias candidatas, con sus Items y enlaces, y las Propuestas ya escritas esta semana, para no repetir.
 
-## Datos: cero invención
+## Datos: contrastados o fuera
 
-- Cifras, versiones, nombres, fechas y citas salen **solo** de los Items o de la fuente original.
-- Si necesitas un dato que no está en los resúmenes, lee la fuente original con WebFetch. En vulnerabilidades y releases, léela **siempre** antes de escribir: las versiones afectadas, las parcheadas y lo que hay que hacer son lo que más valor aporta. Límite por formato: resumen 8, linkedin 3, didactico 4, bomba 2, ideas-didacticas 0.
-- Si no puedes confirmar un dato, no lo pongas, o dilo ("según el anuncio de X…").
+La credibilidad del canal depende de esto. **Un dato que solo aparece en un sitio no se da por bueno.**
+
+- **Qué es un dato:** toda cifra, versión, precio, fecha, porcentaje, CVE o puntuación, nombre de producto o modelo, afirmación de hecho ("ya se está explotando", "es gratis") y cita textual. Vale igual para el guion, los Gráficos y los posts.
+- **Cuándo está contrastado** (uno de los dos):
+  1. **Fuente primaria oficial:** el anuncio, las release notes, el advisory o el changelog de quien lo publica (nginx.org, postgresql.org, openai.com, el aviso del CVE, la propia empresa…), leído por ti con WebFetch; o
+  2. **dos fuentes independientes y de confianza** que lo digan por separado (medios técnicos serios, investigadores que lo publican, no dos newsletters que resumen el mismo artículo).
+- **Lo que NO cuenta:** el resumen de una newsletter (TLDR y similares) por sí solo, una sola noticia de prensa, deducirlo "por coherencia", calcularlo a partir de otro dato no confirmado, o tu memoria.
+- **Cifras de la propia empresa sobre sí misma** (benchmarks, "un 98 % de calidad") solo se dan atribuidas ("según Microsoft…") y con fuente primaria; nunca en un rótulo como si fueran un hecho.
+- **Si no puedes contrastarlo, no lo pongas.** Reescribe la frase sin el dato ("han corregido varias versiones; mira el aviso de tu distribución") o deja fuera el Gráfico. Mejor un dato menos que uno mal.
+- Lee las fuentes con WebFetch todo lo que haga falta para cumplir esto. Límite por formato: resumen 16, didactico 8, linkedin 5, bomba 4, ideas-didacticas 2. Si llegas al límite, quita los datos que no hayas podido contrastar.
+
+### Sección `## Verificación` (obligatoria)
+
+Al final de cada guion, post o Vídeo bomba, añade una sección `## Verificación` con una tabla de **todos** los datos que aparecen, incluidos los de los Gráficos. La CLI rechaza la Propuesta si falta. No se publica: se guarda aparte para que la persona editora la audite.
+
+```markdown
+## Verificación
+
+| Dato | Fuentes | Estado |
+|---|---|---|
+| NGINX 1.30.7 y 1.31.9 corrigen los dos CVE | https://nginx.org/… · https://www.wiz.io/… | ✅ oficial |
+| Fable 5.2 cuesta 8 $ / 40 $ por millón | https://www.anthropic.com/… | ✅ oficial |
+| MAI Code 2 llega al 98 % de GPT-6.1 Sol | https://microsoft.ai/… | ✅ oficial (atribuido a Microsoft) |
+| Gemini 4 Neon es #3 en AA Index | solo TLDR | ❌ fuera del guion |
+```
+
+- **Estados:** `✅ oficial` (fuente primaria), `✅ 2 fuentes` (dos independientes) o `❌ fuera` (no contrastado y, por tanto, **no aparece** en el texto ni en los Gráficos).
+- Cada fila con la URL concreta que leíste, no la portada del sitio.
 
 ## Entregar
 
 Cada Propuesta se entrega en dos pasos:
 
-1. Escribe el Markdown con la herramienta **Write** en `data/borradores/<nombre-corto>.md`. Es la única carpeta en la que puedes escribir.
+1. Escribe el Markdown con la herramienta **Write** en `data/borradores/<nombre-corto>.md`, terminado en su sección `## Verificación`. Es la única carpeta en la que puedes escribir.
 2. Guárdala con un único comando:
 
 ```bash

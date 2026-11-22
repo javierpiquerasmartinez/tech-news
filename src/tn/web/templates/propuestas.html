@@ -33,7 +33,7 @@
 {% else %}
   <div class="lista">
     {% for t in tarjetas %}
-      {% with p=t['p'], html=t['html'], siguientes=t['siguientes'], error=None, editando=False %}
+      {% with p=t['p'], html=t['html'], siguientes=t['siguientes'], error=None, editando=False, verif_html=t['verif_html'], verif_total=t['verif_total'], verif_fuera=t['verif_fuera'] %}
         {% include "_propuesta.html" %}
       {% endwith %}
     {% endfor %}

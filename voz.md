@@ -26,7 +26,7 @@ Un ingeniero de software senior, full stack, que se ha leído todo lo de la sema
 - "Sin más dilación", "en el día de hoy", "a día de hoy", "cabe destacar", "dicho esto".
 - "Revolucionario", "esto lo cambia todo", "game changer", "brutal", "increíble" como relleno.
 - Emojis en cada línea; mayúsculas para gritar; clickbait ("no vas a creer…").
-- Inventar cifras, versiones, fechas o citas. Si no está en las fuentes, no se dice.
+- Inventar cifras, versiones, fechas o citas, o dar por bueno un dato que solo aparece en un sitio. Todo dato va contrastado con la fuente oficial o con dos fuentes independientes de confianza; si no, no se dice.
 
 ## Saludo y cierre
 
