@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+.pytest_cache/
+*.egg-info/
+
+# Capa máquina (ADR-0003): la SQLite vive fuera de git
+data/
+
+# Secretos (token de Telegram, etc.)
+.env
