@@ -75,3 +75,15 @@ def test_extraer_plantillas_de_un_proyecto(tmp_path, monkeypatch):
     assert json.loads(rutas[1].read_text())["id"] == "S1"
     with pytest.raises(capcut.CapCutNoDisponible):
         capcut.extraer_plantillas("no-existe")
+
+
+def test_acepta_el_unico_video_de_la_carpeta(tmp_path, monkeypatch):
+    monkeypatch.setenv("TN_MONTAJES", str(tmp_path))
+    c = tmp_path / "2026-11-13"
+    c.mkdir()
+    (c / "IMG_6804.MOV").write_bytes(b"x")
+    (c / "grabacion-limpia.mp4").write_bytes(b"x")  # salida nuestra: no cuenta
+    assert montaje.Montaje(date(2026, 11, 13)).grabacion.name == "IMG_6804.MOV"
+    (c / "otro.mp4").write_bytes(b"x")
+    with pytest.raises(montaje.MontajeInvalido, match="renombra"):
+        montaje.Montaje(date(2026, 11, 13)).grabacion

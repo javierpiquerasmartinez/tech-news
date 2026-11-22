@@ -48,9 +48,17 @@ class Montaje:
 
     @property
     def grabacion(self) -> Path:
+        """`grabacion.<ext>` o, si no la hay, el único vídeo de la carpeta (p. ej. IMG_6804.MOV del iPhone)."""
         for ext in EXTENSIONES:
             if (self.carpeta / f"grabacion{ext}").is_file():
                 return self.carpeta / f"grabacion{ext}"
+        videos = [f for f in self.carpeta.iterdir()
+                  if f.suffix.lower() in EXTENSIONES and not f.stem.startswith(("grabacion-", "."))] \
+            if self.carpeta.is_dir() else []
+        if len(videos) == 1:
+            return videos[0]
+        if len(videos) > 1:
+            raise MontajeInvalido(f"Hay {len(videos)} vídeos en {self.carpeta}: renombra el bueno a grabacion.mp4/.mov")
         raise MontajeInvalido(
             f"No encuentro la Grabación: déjala en {self.carpeta}/grabacion.mp4 (o .mov)")
 
@@ -95,6 +103,12 @@ def _ffmpeg(*args: str) -> subprocess.CompletedProcess:
     return r
 
 
+def _codec_video(ruta: Path) -> str:
+    r = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=codec_name",
+                        "-of", "csv=p=0", str(ruta)], capture_output=True, text=True)
+    return r.stdout.strip()
+
+
 def medir_loudness(ruta: Path, filtro_previo: str = "") -> dict:
     """Primera pasada de loudnorm: mide el audio (LUFS, pico, rango) sin escribir nada."""
     objetivo = f"loudnorm=I={LOUDNORM['I']}:TP={LOUDNORM['TP']}:LRA={LOUDNORM['LRA']}:print_format=json"
@@ -111,7 +125,9 @@ def preparar_audio(entrada: Path, salida: Path) -> dict:
             f":measured_I={m['input_i']}:measured_TP={m['input_tp']}:measured_LRA={m['input_lra']}"
             f":measured_thresh={m['input_thresh']}:offset={m['target_offset']}:linear=true")
     tmp = salida.with_suffix(".tmp.mp4")
-    _ffmpeg("-y", "-i", str(entrada), "-map", "0:v?", "-map", "0:a:0", "-c:v", "copy",
+    # hvc1: sin esta etiqueta, QuickTime y CapCut no abren el HEVC del iPhone copiado a .mp4.
+    _ffmpeg("-y", "-i", str(entrada), "-map", "0:v:0?", "-map", "0:a:0", "-c:v", "copy", "-tag:v", "hvc1"
+            if _codec_video(entrada) == "hevc" else "avc1",
             "-af", f"{FILTRO_VOZ},{norm}", "-ar", "48000", "-c:a", "aac", "-b:a", "192k",
             "-movflags", "+faststart", str(tmp))
     tmp.replace(salida)
