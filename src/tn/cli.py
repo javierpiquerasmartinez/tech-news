@@ -203,6 +203,11 @@ def cmd_editor_aplicar(
         _fallar(e)
     finally:
         conn.close()
+    # Un borrador ya aplicado se borra para que no se reaplique por error.
+    if fichero and fichero != "-":
+        ruta = (config.raiz() / fichero).resolve()
+        if (config.ruta_db().parent / "borradores").resolve() in ruta.parents:
+            ruta.unlink(missing_ok=True)
 
 
 # --- Historias -----------------------------------------------------------------
