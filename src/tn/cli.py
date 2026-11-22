@@ -570,7 +570,7 @@ def cmd_avisar_paquete() -> None:
     if resumen:
         texto += "\n\n— Gancho —\n" + _seccion(resumen.cuerpo, "Gancho")
     texto += "\n\nRevísalo en `uv run tn ui` → Propuestas."
-    _avisar("📦 Paquete semanal listo", texto)
+    _avisar("📦 Guion del vídeo semanal listo", texto)
 
 
 @avisar_app.command("post")
@@ -950,6 +950,7 @@ def cmd_montaje_frases(semana: Annotated[str, typer.Option(help="Semana editoria
 def cmd_montaje_graficos_plan(
     fichero: Annotated[str, typer.Argument(help="JSON del plan (lo usa el agente, en data/borradores/).")],
     semana: Annotated[str, typer.Option(help="Semana editorial del Montaje.")],
+    completo: Annotated[bool, typer.Option("--completo", help="El plan reemplaza a los Gráficos previstos en el guion (al aplicar feedback).")] = False,
 ) -> None:
     """Valida y guarda el plan de rótulos, infografías y capturas."""
     from tn import graficos
@@ -958,7 +959,7 @@ def cmd_montaje_graficos_plan(
     try:
         datos = json.loads(ruta.read_text(encoding="utf-8"))
         plan = datos.get("graficos", datos) if isinstance(datos, dict) else datos
-        avisos = montaje.guardar_plan_graficos(montaje.Montaje(_semana(semana)), plan)
+        avisos = montaje.guardar_plan_graficos(montaje.Montaje(_semana(semana)), plan, completo=completo)
     except (json.JSONDecodeError, FileNotFoundError, graficos.PlanInvalido, montaje.MontajeInvalido) as e:
         _fallar(e)
     if (config.ruta_db().parent / "borradores").resolve() in ruta.parents:
@@ -1125,7 +1126,7 @@ def _redactar(formato: str, instrucciones: str, origen: str) -> None:
 @app.command("redactar")
 def cmd_redactar(
     resumen: Annotated[bool, typer.Option("--resumen", help="Guion del Resumen semanal.")] = False,
-    linkedin: Annotated[bool, typer.Option("--linkedin", help="3 Posts de LinkedIn de la semana.")] = False,
+    linkedin: Annotated[bool, typer.Option("--linkedin", help="3 posts de golpe (a mano; lo habitual es --post, uno al día).")] = False,
     post: Annotated[bool, typer.Option("--post", help="El post de LinkedIn del día: lo más fuerte de las últimas 48 h.")] = False,
     didactico: Annotated[bool, typer.Option("--didactico", help="3 ideas de Vídeo didáctico.")] = False,
     semana: OpcionSemana = None,

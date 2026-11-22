@@ -257,8 +257,36 @@ def contexto_graficos(m: "Montaje") -> dict:
     ctx = graficos.contexto_agente(corte_, trans, m.guion())
     # La Ficha de feedback y el plan anterior: la siguiente versión corrige sobre lo que había.
     ctx["feedback"] = [n.como_dict() for n in feedback.leer(m.semana)]
-    ctx["plan_anterior"] = json.loads(m.plan_graficos.read_text()) if m.plan_graficos.is_file() else []
+    anclados, sin_ancla = graficos.anclar(graficos.previstos_de_guion(m.guion()), corte_.get("bloques", []),
+                                          trans.get("palabras", []))
+    ctx["previstos_anclados"] = anclados
+    ctx["previstos_sin_ancla"] = sin_ancla
+    ctx["plan_anterior"] = plan_actual(m)
     return ctx
+
+
+def _leer_plan_agente(m: "Montaje") -> tuple[bool, list[dict]]:
+    """(completo, gráficos) del plan del agente. `completo`: reemplaza a los previstos del guion."""
+    if not m.plan_graficos.is_file():
+        return False, []
+    datos = json.loads(m.plan_graficos.read_text())
+    if isinstance(datos, list):  # formato anterior al modelo híbrido
+        return False, datos
+    return bool(datos.get("completo")), datos.get("graficos", [])
+
+
+def plan_actual(m: "Montaje") -> list[dict]:
+    """Gráficos decididos (sin estructurales): previstos anclados + los del agente."""
+    from tn import graficos
+
+    corte_ = json.loads(m.corte.read_text())
+    completo, del_agente = _leer_plan_agente(m)
+    if completo:
+        return del_agente
+    trans_ruta = m.carpeta / "transcripcion-corte.json"
+    palabras = json.loads(trans_ruta.read_text()).get("palabras", []) if trans_ruta.is_file() else []
+    anclados, _ = graficos.anclar(graficos.previstos_de_guion(m.guion()), corte_.get("bloques", []), palabras)
+    return anclados + del_agente
 
 
 def version_actual(m: "Montaje") -> str:
@@ -275,8 +303,12 @@ def feedback_sin_aplicar(m: "Montaje") -> bool:
     return r.is_file() and (not m.plan_graficos.is_file() or r.stat().st_mtime > m.plan_graficos.stat().st_mtime)
 
 
-def guardar_plan_graficos(m: "Montaje", plan: list[dict]) -> list[str]:
-    """Valida el plan del agente (sin estructurales) y lo guarda. Devuelve avisos."""
+def guardar_plan_graficos(m: "Montaje", plan: list[dict], completo: bool = False) -> list[str]:
+    """Valida el plan del agente (sin estructurales) y lo guarda. Devuelve avisos.
+
+    `completo=False`: el plan añade a los Gráficos previstos en el guion.
+    `completo=True`: el plan los reemplaza (al aplicar feedback se reescribe todo).
+    """
     from tn import graficos
 
     duracion = json.loads(m.corte.read_text())["duracion_corte"]
@@ -284,17 +316,39 @@ def guardar_plan_graficos(m: "Montaje", plan: list[dict]) -> list[str]:
     if prohibidos:
         raise graficos.PlanInvalido("Cabeceras, sello y pantalla final los pone el código: quítalos del plan")
     validado = graficos.validar(plan, duracion)
-    m.plan_graficos.write_text(json.dumps(validado, ensure_ascii=False, indent=1))
-    completo = graficos.validar(validado + graficos.estructurales(json.loads(m.corte.read_text())), duracion)
-    return graficos.solapes(completo)
+    m.plan_graficos.write_text(json.dumps({"completo": completo, "graficos": validado}, ensure_ascii=False, indent=1))
+    todo = graficos.validar(plan_actual(m) + graficos.estructurales(json.loads(m.corte.read_text())), duracion)
+    return graficos.solapes(todo)
+
+
+def necesita_agente(m: "Montaje") -> tuple[bool, str]:
+    """El agente solo entra si hay feedback nuevo, Gráficos previstos sin ancla o bloques sin Gráficos."""
+    from tn import graficos
+
+    if feedback_sin_aplicar(m):
+        return True, "hay notas de feedback nuevas"
+    if m.plan_graficos.is_file():
+        return False, "ya hay plan"
+    corte_ = json.loads(m.corte.read_text())
+    trans = json.loads((m.carpeta / "transcripcion-corte.json").read_text())
+    previstos = graficos.previstos_de_guion(m.guion())
+    _, sin = graficos.anclar(previstos, corte_.get("bloques", []), trans.get("palabras", []))
+    if sin:
+        return True, f"{len(sin)} Gráficos previstos sin ancla"
+    numerados = [b for b in corte_.get("bloques", []) if re.match(r"\d+\.", b["titulo"]) and not b.get("dudoso")]
+    sin_graficos = [b for b in numerados if b["titulo"] not in previstos]
+    if sin_graficos:
+        return True, f"{len(sin_graficos)} bloques sin Gráficos previstos"
+    return False, "todo previsto y anclado"
 
 
 def hacer_graficos(m: "Montaje", con_agente: bool = True, origen: str = "manual", al_avanzar=None) -> dict:
     from tn import agentes, capcut, config, db, graficos
 
-    if con_agente and (not m.plan_graficos.is_file() or feedback_sin_aplicar(m)):
+    hace_falta, motivo = necesita_agente(m)
+    if con_agente and hace_falta:
         if al_avanzar:
-            al_avanzar("graficos: el agente decide rótulos, infografías y capturas")
+            al_avanzar(f"graficos: el agente completa el plan ({motivo})")
         conn = db.conectar(config.ruta_db())
         try:
             r = agentes.lanzar(conn, "montador-graficos", f"Semana: {m.semana.isoformat()}.", origen=origen)
@@ -303,8 +357,7 @@ def hacer_graficos(m: "Montaje", con_agente: bool = True, origen: str = "manual"
         if r.estado != "ok" or not m.plan_graficos.is_file():
             raise MontajeInvalido(f"El agente no dejó plan de Gráficos: {r.resultado[-400:]}")
     corte_ = json.loads(m.corte.read_text())
-    propios = json.loads(m.plan_graficos.read_text()) if m.plan_graficos.is_file() else []
-    plan = graficos.validar(propios + graficos.estructurales(corte_), corte_["duracion_corte"])
+    plan = graficos.validar(plan_actual(m) + graficos.estructurales(corte_), corte_["duracion_corte"])
     trabajo = capcut.carpeta_trabajos() / m.trabajo
     hechos, fallidos = [], []
     for g in plan:

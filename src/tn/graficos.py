@@ -128,6 +128,84 @@ def contexto_agente(corte: dict, transcripcion_corte: dict, guion: str) -> dict:
     return {"duracion_corte": corte.get("duracion_corte"), "estructurales": estructurales(corte), "bloques": bloques}
 
 
+# --- Gráficos previstos en el guion (modelo híbrido) -------------------------------------
+#
+# El Redactor cierra el QUÉ al escribir el guion (sección ~~~graficos de cada bloque, con una
+# `ancla`: palabras que se dirán). El Montador solo decide el CUÁNDO buscando el ancla en la
+# transcripción. El agente entra solo para lo que no cuadra o para aplicar feedback.
+
+_BLOQUE_GRAFICOS = re.compile(r"^(?:~~~|```)graficos\s*\n(.*?)^(?:~~~|```)\s*$", re.M | re.S)
+UMBRAL_ANCLA = 0.6
+
+
+def previstos_de_guion(guion: str) -> dict[str, list[dict]]:
+    """{titulo del bloque: [{tipo, ancla, datos}]} leído de las secciones ~~~graficos del guion."""
+    import yaml
+
+    from tn import corte as corte_mod
+
+    res = {}
+    for b in corte_mod.bloques_guion(guion):
+        lista = []
+        for m in _BLOQUE_GRAFICOS.finditer(b["original"]):
+            try:
+                datos = yaml.safe_load(m.group(1)) or []
+            except yaml.YAMLError as e:
+                raise PlanInvalido(f"Bloque «{b['titulo']}»: la sección de Gráficos no es YAML válido ({e})") from None
+            for g in datos if isinstance(datos, list) else []:
+                if isinstance(g, dict) and g.get("tipo") in DURACIONES:
+                    lista.append({"tipo": g["tipo"], "ancla": str(g.get("ancla") or ""),
+                                  "datos": g.get("datos") or {}, **({"duracion": g["duracion"]} if g.get("duracion") else {})})
+        if lista:
+            res[b["titulo"]] = lista
+    return res
+
+
+def buscar_ancla(ancla: str, palabras: list[dict], desde: float, hasta: float) -> tuple[float | None, float]:
+    """Segundo (en el Corte) en el que se dicen las palabras del ancla, y lo bien que casan (0–1)."""
+    from difflib import SequenceMatcher
+
+    from tn.corte import normalizar
+
+    objetivo = normalizar(ancla).split()
+    if not objetivo:
+        return None, 0.0
+    ventana = [p for p in palabras if desde - 2 <= p["inicio"] <= hasta + 2]
+    # Se compara token a token: "1.30.7" son tres tokens (1, 30, 7) tanto en el ancla como dicho.
+    tokens, de_palabra = [], []
+    for i, p in enumerate(ventana):
+        for t in normalizar(p["palabra"]).split():
+            tokens.append(t)
+            de_palabra.append(i)
+    mejor, cuando = 0.0, None
+    n = len(objetivo)
+    for i in range(len(tokens)):
+        for largo in (n - 1, n, n + 1, n + 2):
+            trozo = tokens[i:i + max(largo, 1)]
+            r = SequenceMatcher(None, objetivo, trozo).ratio()
+            if r > mejor:
+                mejor, cuando = r, ventana[de_palabra[i]]["inicio"]
+    return (cuando, mejor) if mejor >= UMBRAL_ANCLA else (None, mejor)
+
+
+def anclar(previstos: dict[str, list[dict]], bloques: list[dict], palabras: list[dict]) -> tuple[list[dict], list[dict]]:
+    """Coloca los Gráficos previstos en el tiempo. Devuelve (anclados, sin_ancla)."""
+    anclados, sin = [], []
+    por_titulo = {b["titulo"]: b for b in bloques}
+    for titulo, lista in previstos.items():
+        b = por_titulo.get(titulo)
+        for g in lista:
+            if not b or b.get("dudoso"):
+                sin.append({**g, "bloque": titulo, "motivo": "el bloque no se encontró en la grabación"})
+                continue
+            t, parecido = buscar_ancla(g["ancla"], palabras, b["inicio"], b["fin"])
+            if t is None:
+                sin.append({**g, "bloque": titulo, "motivo": f"no se dijo el ancla (parecido {parecido:.0%})"})
+            else:
+                anclados.append({**g, "inicio": round(t, 2), "bloque": titulo, "origen": "guion"})
+    return anclados, sin
+
+
 # --- Capturas ----------------------------------------------------------------------------
 
 

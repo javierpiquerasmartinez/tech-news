@@ -47,6 +47,7 @@ def test_solapes():
 
 def test_el_agente_no_puede_poner_estructurales(tmp_path, monkeypatch):
     monkeypatch.setenv("TN_MONTAJES", str(tmp_path))
+    monkeypatch.setenv("TN_HOME", str(tmp_path))
     m = montaje.Montaje(date(2026, 11, 13))
     m.carpeta.mkdir()
     m.corte.write_text(json.dumps(CORTE))
@@ -54,7 +55,8 @@ def test_el_agente_no_puede_poner_estructurales(tmp_path, monkeypatch):
         montaje.guardar_plan_graficos(m, [{"tipo": "sello", "inicio": 1, "datos": {}}])
     avisos = montaje.guardar_plan_graficos(m, [{"tipo": "rotulo", "inicio": 21.5, "datos": {"valor": "9.2"}}])
     assert any("cabecera" in a for a in avisos)  # pisa la cabecera del bloque 1
-    assert json.loads(m.plan_graficos.read_text())[0]["id"] == "g01-rotulo"
+    guardado = json.loads(m.plan_graficos.read_text())
+    assert guardado["completo"] is False and guardado["graficos"][0]["id"] == "g01-rotulo"
 
 
 def test_las_plantillas_tienen_los_campos_que_valida_el_codigo():
@@ -65,3 +67,57 @@ def test_las_plantillas_tienen_los_campos_que_valida_el_codigo():
         for campo in graficos.CAMPOS[tipo]:
             if tipo != "captura":  # url se convierte en imagen antes de renderizar
                 assert f"d.{campo}" in html, f"{tipo} no usa {campo}"
+
+
+GUION = """## Gancho · literal
+Hola.
+
+## 1. NGINX: dos fallos críticos · ~1:45
+**Entrada · literal:** Wiz ha encontrado dos fallos en HTTP/2 de NGINX.
+- Corregido en 1.30.7 y 1.31.9.
+**Fuentes:** https://www.wiz.io/blog/x
+**Gráficos:**
+~~~graficos
+- tipo: rotulo
+  ancla: "corregido en 1.30.7 y 1.31.9"
+  datos: {etiqueta: Versiones corregidas, valor: "1.30.7 · 1.31.9", tono: alerta}
+- tipo: captura
+  ancla: "esto no lo voy a decir nunca"
+  datos: {url: "https://www.wiz.io/blog/x", fuente: wiz.io}
+~~~
+
+## Cierre · literal
+Adiós.
+"""
+
+
+def _palabras(texto, inicio):
+    res, t = [], inicio
+    for w in texto.split():
+        res.append({"palabra": w, "inicio": round(t, 2), "fin": round(t + 0.3, 2)})
+        t += 0.35
+    return res
+
+
+def test_previstos_del_guion_y_anclas():
+    previstos = graficos.previstos_de_guion(GUION)
+    assert list(previstos) == ["1. NGINX: dos fallos críticos"]
+    assert [g["tipo"] for g in previstos["1. NGINX: dos fallos críticos"]] == ["rotulo", "captura"]
+    palabras = _palabras("Wiz ha encontrado dos fallos en NGINX y está corregido en la uno treinta siete", 30.0)
+    palabras += _palabras("Corregido en 1.30.7 y 1.31.9 así que actualiza", 40.0)
+    bloques = [{"titulo": "1. NGINX: dos fallos críticos", "inicio": 29.0, "fin": 45.0}]
+    anclados, sin = graficos.anclar(previstos, bloques, palabras)
+    assert [(g["tipo"], g["inicio"]) for g in anclados] == [("rotulo", 40.0)]
+    assert sin[0]["tipo"] == "captura" and "no se dijo el ancla" in sin[0]["motivo"]
+
+
+def test_ancla_tolera_pequenas_diferencias():
+    palabras = _palabras("bueno pues lo han corregido en la 1.30.7 y en la 1.31.9", 10.0)
+    t, parecido = graficos.buscar_ancla("corregido en 1.30.7 y 1.31.9", palabras, 9.0, 20.0)
+    assert t is not None and parecido >= graficos.UMBRAL_ANCLA
+
+
+def test_sin_previstos_no_rompe_y_yaml_malo_avisa():
+    assert graficos.previstos_de_guion("## 1. Algo\nsin gráficos\n") == {}
+    with pytest.raises(graficos.PlanInvalido, match="YAML"):
+        graficos.previstos_de_guion("## 1. Algo\n~~~graficos\n- tipo: [rotulo\n~~~\n")
