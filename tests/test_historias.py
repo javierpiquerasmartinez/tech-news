@@ -112,3 +112,10 @@ def test_prefiltro_quita_formularios_de_la_newsletter():
     res = prefiltrar([ItemRecogido(fuente_id="tldr-tech", url="https://x.example",
                                    titulo="Become a founding member of TLDR's AI community (2 minute form)")])
     assert res.aceptados == []
+
+
+def test_una_historia_usada_se_puede_destacar(conn):
+    [hid] = historias.aplicar_lote(conn, {"nuevas": [{"titulo": "NGINX", "area": "seguridad", "items": [5], **_p()}]})["historias_creadas"]
+    historias.marcar_usada(conn, hid)
+    historias.destacar(conn, hid, "web")
+    assert historias.ver(conn, hid)[0]["estado"] == "destacada"

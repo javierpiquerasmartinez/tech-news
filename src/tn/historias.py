@@ -293,7 +293,8 @@ def descartar(conn: sqlite3.Connection, hid: int, motivo: str | None, origen: st
 
 
 def destacar(conn: sqlite3.Connection, hid: int, origen: str) -> None:
-    _cambiar_estado(conn, hid, "destacada", permitido_desde=("nueva",))
+    # También una usada: puede ir en un post y además en el Resumen semanal.
+    _cambiar_estado(conn, hid, "destacada", permitido_desde=("nueva", "usada"))
     _decision(conn, hid, "destacar", {}, origen)
     conn.commit()
 
