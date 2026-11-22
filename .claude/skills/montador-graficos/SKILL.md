@@ -5,7 +5,13 @@ description: Paso de Gráficos del Montador de tech-news. Decide qué rótulos d
 
 # Montador · Gráficos
 
-Decides los Gráficos que acompañan a la persona editora mientras habla. Las **cabeceras de bloque, el sello y la pantalla final ya los pone el código**: tú solo decides **rótulos, tablas, pasos y capturas**. Vocabulario en `GLOSSARY.md`.
+Los Gráficos de cada bloque **ya vienen decididos en el guion** (el Redactor los escribe y la persona editora los aprueba), cada uno con un `ancla`: las palabras en las que entra. El código los coloca solo buscando el ancla en la transcripción. **Tú entras solo para lo que no cuadra:**
+
+- Gráficos previstos cuyo ancla no se encontró (se dijo de otra forma o se saltó).
+- Bloques sin Gráficos previstos (guiones antiguos).
+- Notas de feedback de la persona editora sobre la versión anterior.
+
+Las **cabeceras de bloque, el sello y la pantalla final los pone el código**. Vocabulario en `GLOSSARY.md`.
 
 Ejecutas los comandos **exactamente como aparecen aquí**: sin opciones extra, sin redirecciones, sin tuberías y sin encadenar comandos.
 
@@ -13,11 +19,20 @@ Ejecutas los comandos **exactamente como aparecen aquí**: sin opciones extra, s
 
 1. Lee `estilo-edicion.md` entero: densidad, posiciones, texto en pantalla, cuándo usar cada Gráfico.
 2. `uv run tn montaje frases --semana <semana>` devuelve un JSON con:
-   - `bloques`: por bloque, su `inicio` y `fin` en segundos del Corte, la línea `visual` y las `fuentes` del guion, sus `puntos_clave` y las `frases` que se dicen, cada una con su tiempo `t`;
-   - `estructurales`: lo que ya está puesto (cabeceras, sello y final). No lo pises.
-   - `feedback`: notas de la persona editora sobre la versión anterior (`minuto` en el tiempo del vídeo, que es el del Corte) y `plan_anterior`: los Gráficos que decidiste entonces. **Si hay notas, tu trabajo es corregir el plan anterior aplicándolas** (mover, quitar, acortar, cambiar el texto o el tipo), no empezar de cero. Si una nota pide algo que no se arregla con Gráficos (una frase del Corte, el color de la guía…), dilo en tu resumen.
-3. Para cada bloque (los que tienen `dudoso: true` déjalos sin Gráficos), elige **2–4 Gráficos** y su segundo exacto: el `t` de la frase en la que se dice lo que muestran. Que no se pisen entre sí ni con la cabecera del bloque (que ocupa ≈2,6 s desde el inicio del bloque).
-4. Escribe el plan con **Write** en `data/borradores/graficos-<semana>.json` y guárdalo con `uv run tn montaje graficos-plan data/borradores/graficos-<semana>.json --semana <semana>`. Si la CLI lo rechaza, corrige y repite. Los avisos de solape también se corrigen.
+   - `bloques`: por bloque, su `inicio` y `fin` en segundos del Corte, sus `fuentes`, `puntos_clave` y las `frases` que se dicen, cada una con su tiempo `t`;
+   - `previstos_anclados`: los Gráficos del guion ya colocados. **No los repitas** en tu plan;
+   - `previstos_sin_ancla`: Gráficos del guion que hay que colocar. Busca en las `frases` de su bloque el momento en que se dice lo que muestran;
+   - `estructurales`: cabeceras, sello y final, ya puestos;
+   - `feedback` y `plan_anterior`: notas de la persona editora y el plan de la versión anterior.
+3. Decide según el caso:
+   - **Sin feedback:** tu plan contiene **solo** los `previstos_sin_ancla` colocados, con sus mismos datos, y, para los bloques sin Gráficos previstos (sin `dudoso: true`), 2–4 Gráficos nuevos. Si un previsto no se dijo en absoluto, déjalo fuera y dilo en tu resumen.
+   - **Con feedback:** reescribe el plan **completo**, partiendo de `plan_anterior` y aplicando las notas (mover, quitar, acortar, cambiar el texto o el tipo). Si una nota pide algo que no se arregla con Gráficos (una frase del Corte, el color de la guía…), dilo en tu resumen.
+4. Que nada se pise entre sí ni con la cabecera del bloque (≈2,6 s desde su inicio), ni con los `previstos_anclados` si no estás en modo feedback.
+5. Escribe el plan con **Write** en `data/borradores/graficos-<semana>.json` y guárdalo:
+   - sin feedback: `uv run tn montaje graficos-plan data/borradores/graficos-<semana>.json --semana <semana>`
+   - con feedback: `uv run tn montaje graficos-plan data/borradores/graficos-<semana>.json --semana <semana> --completo`
+
+   Si la CLI lo rechaza o avisa de solapes, corrige y repite.
 
 ## Tipos y datos
 

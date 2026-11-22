@@ -116,6 +116,10 @@ _Avoid_: EDL, rough cut
 Una pieza visual que se superpone a la Grabación: cabecera de bloque, rótulo de dato, infografía animada o captura de fuente.
 _Avoid_: Overlay, motion graphic, visual
 
+**Ancla**:
+Las palabras del guion en las que entra un Gráfico previsto. El Montador las busca en la Grabación para saber en qué segundo colocarlo.
+_Avoid_: Cue, marca, trigger
+
 **Montaje**:
 El resultado del Montador para un guion: un proyecto de CapCut con el Corte y los Gráficos colocados, listo para retocar y exportar.
 _Avoid_: Edición, draft, proyecto

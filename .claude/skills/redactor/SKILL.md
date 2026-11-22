@@ -65,8 +65,16 @@ Elige **6–8 Historias** de las candidatas. **Todas las Historias en estado `de
 - <punto clave con dato exacto>
 - <punto clave>
 - <qué significa para un dev full stack / qué haría yo>
-**Visual:** <captura, gráfico o código que mostrar>
 **Fuentes:** <enlaces>
+**Gráficos:**
+~~~graficos
+- tipo: rotulo
+  ancla: "<3–8 palabras que dirás, copiadas del texto de este bloque>"
+  datos: {etiqueta: "<qué es>", valor: "<cifra/versión>", detalle: "<opcional>", tono: dato}
+- tipo: captura
+  ancla: "<…>"
+  datos: {url: "<una de las Fuentes>", fuente: "<dominio>", cita: "<frase literal de la fuente, opcional>"}
+~~~
 **Transición · literal:** <frase hacia el siguiente bloque>
 
 … (un bloque por Historia)
@@ -77,6 +85,20 @@ Elige **6–8 Historias** de las candidatas. **Todas las Historias en estado `de
 ## Descripción de YouTube
 <2–3 líneas + capítulos con minuto aproximado + lista de fuentes>
 ```
+
+#### Gráficos del Resumen semanal
+
+Cada bloque lleva su sección **Gráficos**: lo que aparecerá en pantalla mientras la persona editora habla. Se cierra aquí, con el guion, para que lo apruebe junto con el texto y sepa qué saldrá al grabar. El Montador solo lo coloca en el tiempo. Las cabeceras de bloque, el sello y la pantalla final los pone el código: no los escribas.
+
+- **2–4 Gráficos por bloque**, siguiendo `estilo-edicion.md` (léela si no lo has hecho). Como mucho uno a pantalla completa (tabla, pasos o captura) por bloque.
+- **`ancla`:** de 3 a 8 palabras **copiadas tal cual** de la entrada literal o de un punto clave de ese bloque. El Gráfico entra cuando se dicen. Elige palabras distintivas (nombres, cifras), no muletillas.
+- **Tipos y `datos`:**
+  - `rotulo`: `etiqueta`, `valor` (≤ 16 caracteres), `detalle` y `tono` (`dato` o `alerta`, esta solo en seguridad).
+  - `tabla`: `titulo`, `columnas`, `filas` (2–5) y `destacar` (índice de la fila a resaltar).
+  - `pasos`: `titulo` y `pasos` (2–4, el código entre comillas invertidas), con `tono`.
+  - `captura`: `url` (una de las **Fuentes** del bloque), `fuente` (el dominio) y `cita` (frase literal de la fuente, opcional).
+- **Datos solo de las fuentes**, como el resto del guion: si no puedes confirmar una cifra, no hagas un rótulo con ella.
+- La sección va entre `~~~graficos` y `~~~`, en YAML, exactamente con esa forma: el Montador la lee.
 
 ### `linkedin`: post diario (lo habitual)
 
@@ -105,7 +127,7 @@ No escribas los guiones completos: solo se escriben cuando la persona editora ap
 
 ### `didactico`: guion de Vídeo didáctico (8–12 min)
 
-Para la Historia indicada. Mismo formato mixto que el resumen: gancho literal; bloques de contexto, el concepto explicado desde cero, un ejemplo práctico (código si aplica, idealmente JS/TS o lo que use la noticia) e implicaciones; cierre literal. Cada bloque lleva duración, visual y fuentes. Incluye título, miniatura y descripción de YouTube.
+Para la Historia indicada. Mismo formato mixto que el resumen: gancho literal; bloques de contexto, el concepto explicado desde cero, un ejemplo práctico (código si aplica, idealmente JS/TS o lo que use la noticia) e implicaciones; cierre literal. Cada bloque lleva duración, fuentes y su sección **Gráficos**, igual que en el resumen. Incluye título, miniatura y descripción de YouTube.
 
 ### `bomba`: Vídeo bomba (Short) + post exprés
 
