@@ -129,3 +129,47 @@ def preparar_trabajo(trabajo: str, grabacion: Path, tramos: list[dict], fps: flo
                           "note": f"unidades {', '.join(map(str, t['unidades']))}"} for t in tramos]}
     (carpeta / "transcript" / "cuts.json").write_text(json.dumps(cuts, ensure_ascii=False, indent=1))
     return carpeta
+
+
+# --- Montaje en CapCut --------------------------------------------------------------------
+
+
+def proyecto_existe(nombre: str) -> bool:
+    return (carpeta_proyectos() / nombre).is_dir()
+
+
+def nombre_libre(base: str) -> str:
+    """`<base> v1`, `v2`…: cada ensamblado es un proyecto nuevo y nunca pisa retoques a mano."""
+    n = 1
+    while proyecto_existe(f"{base} v{n}"):
+        n += 1
+    return f"{base} v{n}"
+
+
+def capcut_abierto() -> bool:
+    return subprocess.run(["pgrep", "-f", "CapCut.app/Contents/MacOS"], capture_output=True).returncode == 0
+
+
+def crear_proyecto(trabajo: str, nombre: str) -> None:
+    """`replay` del kit: proyecto nuevo con el Corte (cierra y reabre CapCut si estaba abierto)."""
+    r = ejecutar("replay", trabajo, "--name", nombre, timeout=300)
+    if r.returncode != 0 or not proyecto_existe(nombre):
+        raise CapCutNoDisponible(f"capcut-kit no creó el proyecto: {(r.stderr or r.stdout)[-400:]}")
+
+
+def editar_proyecto(nombre: str, capas: list[dict], zoom_alterno: float | None, carpeta_tmp: Path) -> dict:
+    """Añade todas las capas y el zoom alterno en un único ciclo de guardado (capcut_edicion.py)."""
+    plan = {"kit": str(ruta_kit()), "proyecto": nombre, "capas": capas, "zoom_alterno": zoom_alterno}
+    ruta = carpeta_tmp / "plan-capcut.json"
+    ruta.write_text(json.dumps(plan, ensure_ascii=False, indent=1))
+    script = Path(__file__).with_name("capcut_edicion.py")
+    r = subprocess.run(["uv", "run", "--no-project", "--with", "pyobjc-framework-ApplicationServices",
+                        "--with", "pyobjc-framework-Quartz", "python", str(script), str(ruta)],
+                       capture_output=True, text=True, timeout=300)
+    if r.returncode != 0:
+        raise CapCutNoDisponible(f"No se pudo editar el proyecto: {(r.stderr or r.stdout)[-500:]}")
+    return json.loads(r.stdout.strip().splitlines()[-1])
+
+
+def abrir_capcut() -> None:
+    subprocess.run(["open", "-a", "CapCut"], capture_output=True)

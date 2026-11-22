@@ -49,8 +49,8 @@ def test_montar_retoma_y_rehace(tmp_path, monkeypatch):
     assert llamadas == ["preparar", "transcribir"]
     montaje.montar(semana, hasta="transcribir", rehacer="transcribir")
     assert llamadas == ["preparar", "transcribir", "transcribir"]
-    with pytest.raises(montaje.MontajeInvalido, match="aún no está construido"):
-        montaje.montar(semana, hasta="ensamblar")
+    with pytest.raises(montaje.MontajeInvalido, match="Paso desconocido"):
+        montaje.montar(semana, hasta="publicar")
 
 
 def test_sin_grabacion_dice_donde_dejarla(tmp_path, monkeypatch):
@@ -87,3 +87,32 @@ def test_acepta_el_unico_video_de_la_carpeta(tmp_path, monkeypatch):
     (c / "otro.mp4").write_bytes(b"x")
     with pytest.raises(montaje.MontajeInvalido, match="renombra"):
         montaje.Montaje(date(2026, 11, 13)).grabacion
+
+
+def test_nombre_libre_nunca_pisa_un_proyecto(tmp_path, monkeypatch):
+    monkeypatch.setenv("CAPCUT_DRAFTS", str(tmp_path))
+    assert capcut.nombre_libre("JP Dev 2026-11-13") == "JP Dev 2026-11-13 v1"
+    (tmp_path / "JP Dev 2026-11-13 v1").mkdir()
+    (tmp_path / "JP Dev 2026-11-13 v2").mkdir()
+    assert capcut.nombre_libre("JP Dev 2026-11-13") == "JP Dev 2026-11-13 v3"
+
+
+def test_sin_audio_no_hay_mezcla(tmp_path, monkeypatch):
+    monkeypatch.setenv("TN_MONTAJES", str(tmp_path))
+    m = montaje.Montaje(date(2026, 11, 13))
+    assert montaje.mezcla_audio(m, [], 10.0, tmp_path / "x.mov") is None
+
+
+@hay_ffmpeg
+def test_mezcla_con_musica_y_efectos(tmp_path, monkeypatch):
+    monkeypatch.setenv("TN_MONTAJES", str(tmp_path))
+    for carpeta, nombre in (("musica", "fondo.mp3"), ("efectos", "Whoosh.mp3"), ("efectos", "Pop.mp3")):
+        (tmp_path / "audio" / carpeta).mkdir(parents=True, exist_ok=True)
+        subprocess.run(["ffmpeg", "-loglevel", "error", "-f", "lavfi", "-i", "sine=frequency=440:duration=2",
+                        str(tmp_path / "audio" / carpeta / nombre)], check=True)
+    m = montaje.Montaje(date(2026, 11, 13))
+    plan = [{"tipo": "sello", "inicio": 1.0}, {"tipo": "rotulo", "inicio": 3.0}, {"tipo": "tabla", "inicio": 5.0}]
+    salida = montaje.mezcla_audio(m, plan, 8.0, tmp_path / "mezcla.mov")
+    dur = float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0",
+                                str(salida)], capture_output=True, text=True).stdout)
+    assert abs(dur - 8.0) < 0.2
