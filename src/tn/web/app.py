@@ -256,10 +256,11 @@ def propuesta(request: Request, f: str, editar: bool = False):
 @app.post("/propuesta/estado", response_class=HTMLResponse)
 def propuesta_estado(request: Request, f: str = Form(...), estado: str = Form(...)):
     ruta = _ruta_propuesta(f)
-    try:
-        propuestas.cambiar_estado(ruta, estado, ORIGEN)
-    except propuestas.PropuestaInvalida as e:
-        return _tarjeta_propuesta(request, ruta, str(e))
+    with conexion() as conn:
+        try:
+            propuestas.cambiar_estado(conn, ruta, estado, ORIGEN)
+        except propuestas.PropuestaInvalida as e:
+            return _tarjeta_propuesta(request, ruta, str(e))
     return _tarjeta_propuesta(request, ruta)
 
 

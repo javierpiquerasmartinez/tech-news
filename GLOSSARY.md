@@ -81,7 +81,7 @@ Una Historia que la persona editora retira, con un motivo opcional que alimenta 
 _Avoid_: Borrada, archivada
 
 **Historia usada**:
-Una Historia que ya forma parte de al menos una Propuesta.
+Una Historia en la que se basa al menos una Propuesta aprobada. Que el Redactor la use en un borrador no basta.
 _Avoid_: Publicada (eso es estado de Propuesta)
 
 **Paquete semanal**:

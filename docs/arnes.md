@@ -149,8 +149,9 @@ stateDiagram-v2
   [*] --> nueva: Editor la crea
   nueva --> destacada: tú la destacas
   nueva --> descartada: tú la descartas (motivo opcional)
-  destacada --> usada: entra en una Propuesta
-  nueva --> usada: entra en una Propuesta
+  destacada --> usada: apruebas una Propuesta basada en ella
+  nueva --> usada: apruebas una Propuesta basada en ella
+  usada --> destacada: la quieres también en otra Propuesta
   descartada --> nueva: te arrepientes
   usada --> [*]
   descartada --> [*]
