@@ -4,14 +4,18 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import shutil
+import subprocess
 import sys
+import time
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Annotated
 
 import typer
 
-from tn import agentes, config, db, historias, propuestas
+from tn import agentes, avisos, config, db, historias, horarios, perfil, propuestas, respaldo
 from tn.fuentes import cargar_fuentes
 from tn.http import Http
 from tn.modelo import ORIGENES, ItemRecogido
@@ -23,6 +27,11 @@ app = typer.Typer(
     no_args_is_help=True,
     add_completion=False,
 )
+
+
+@app.callback()
+def _al_arrancar() -> None:
+    config.cargar_env()
 
 OpcionOrigen = Annotated[
     str,
@@ -442,7 +451,14 @@ def cmd_diario(origen: OpcionOrigen = "manual") -> None:
     """La Ejecución diaria completa: recoger → editar → explorar → editar lo que traiga el Explorador."""
     _validar_origen(origen)
     cmd_recoger(fuente=None, origen=origen)
-    editar = _lanzar_agente("editor", "", origen)
+    # Tope por día para no agotar la cuota de Pro: lo que sobre se edita al día siguiente.
+    tope = int(os.environ.get("TN_MAX_ITEMS_DIARIO", "200"))
+    editar = _lanzar_agente(
+        "editor",
+        f"Esta vez procesa como máximo {tope} Items en total (pide lotes con "
+        f"`uv run tn editor pendientes` hasta llegar a {tope}) y termina; el resto queda para mañana.",
+        origen,
+    )
     explorar = _lanzar_agente("explorador", "", origen)
     conn = _conn()
     try:
@@ -467,8 +483,300 @@ def cmd_diario(origen: OpcionOrigen = "manual") -> None:
         conn.close()
     for hid in sin_propuesta:
         _lanzar_agente("redactor", f"Formato: bomba. Historia: {hid}.", origen)
+        _avisar_bomba(hid)
     if editar.estado != "ok" or explorar.estado != "ok":
         raise typer.Exit(1)
+
+
+# --- Avisos ------------------------------------------------------------------------
+
+
+def _avisar(titulo: str, texto: str) -> None:
+    r = avisos.avisar(titulo, texto)
+    if r.telegram:
+        typer.echo(f"Aviso enviado por Telegram: {titulo}")
+    else:
+        typer.secho(f"Aviso sin Telegram ({r.detalle}): {titulo}", fg=typer.colors.YELLOW)
+
+
+def _seccion(cuerpo: str, encabezado: str) -> str:
+    """El texto de la sección `## <encabezado>…` de un Markdown, hasta la siguiente `## `."""
+    m = re.search(rf"^## {re.escape(encabezado)}.*?$\n(.*?)(?=^## |\Z)", cuerpo, re.M | re.S)
+    return m.group(1).strip() if m else ""
+
+
+def _avisar_bomba(hid: int) -> None:
+    conn = _conn()
+    try:
+        h, items = historias.ver(conn, hid)
+    finally:
+        conn.close()
+    bomba = next((p for p in propuestas.listar(propuestas.semana_por_defecto())
+                  if p.meta.get("formato") == "bomba" and hid in p.meta.get("historias", [])), None)
+    texto = f"{h['titulo']}\n\n{h['resumen'] or ''}\n\nPor qué: {h['just_urgencia']}"
+    if bomba:
+        texto += f"\n\n— Short —\n{_seccion(bomba.cuerpo, 'Short')}\n\nPropuesta completa: {bomba.relativa}"
+    texto += "\n\nFuente: " + (items[0]["url"] if items else "—")
+    _avisar("💥 Historia bomba", texto)
+
+
+avisos_app = typer.Typer(help="Configurar y probar los avisos (Telegram y macOS).", no_args_is_help=True)
+app.add_typer(avisos_app, name="avisos")
+
+
+@avisos_app.command("vincular")
+def cmd_avisos_vincular() -> None:
+    """Guarda en .env el chat de Telegram al que avisar (escríbele antes cualquier cosa a tu bot)."""
+    token = os.environ.get("TN_TELEGRAM_TOKEN")
+    if not token:
+        _fallar(RuntimeError("Falta TN_TELEGRAM_TOKEN en .env (créalo con @BotFather y pégalo ahí)"))
+    try:
+        chat = avisos.buscar_chat(token)
+    except Exception as e:  # noqa: BLE001
+        _fallar(RuntimeError(f"Telegram no respondió bien ({type(e).__name__}). ¿El token es correcto?"))
+    if not chat:
+        _fallar(RuntimeError("El bot no tiene mensajes: abre Telegram, escríbele cualquier cosa y repite"))
+    config.guardar_en_env("TN_TELEGRAM_CHAT", chat[0])
+    typer.echo(f"Vinculado al chat de {chat[1] or chat[0]}. Prueba con `uv run tn avisos prueba`.")
+
+
+@avisos_app.command("prueba")
+def cmd_avisos_prueba() -> None:
+    """Envía un aviso de prueba."""
+    _avisar("✅ tech-news", "Los avisos funcionan. Aquí te llegarán las Historias bomba y los paquetes de la semana.")
+
+
+avisar_app = typer.Typer(help="Avisos de la semana (los lanza el horario).", no_args_is_help=True)
+app.add_typer(avisar_app, name="avisar")
+
+
+@avisar_app.command("paquete")
+def cmd_avisar_paquete() -> None:
+    """Viernes: el Resumen semanal y las ideas didácticas están listos."""
+    # La semana más reciente con Resumen (el viernes a las 08:00 ya ha empezado la semana nueva).
+    todas = [p for p in propuestas.listar() if p.meta.get("formato") in ("resumen", "ideas-didacticas")]
+    ultima = max((p.meta.get("semana_editorial", "") for p in todas), default=None)
+    lista = [p for p in todas if p.meta.get("semana_editorial") == ultima]
+    if not lista:
+        _avisar("📦 Paquete semanal", "No hay Resumen semanal: el Redactor no lo escribió. Lánzalo con `uv run tn redactar --resumen`.")
+        return
+    texto = "\n".join(f"• {propuestas.FORMATOS[p.meta['formato']]}: {p.meta.get('titulo')}" for p in lista)
+    resumen = next((p for p in lista if p.meta.get("formato") == "resumen"), None)
+    if resumen:
+        texto += "\n\n— Gancho —\n" + _seccion(resumen.cuerpo, "Gancho")
+    texto += "\n\nRevísalo en `uv run tn ui` → Propuestas."
+    _avisar("📦 Paquete semanal listo", texto)
+
+
+@avisar_app.command("posts")
+def cmd_avisar_posts() -> None:
+    """Lunes: los 3 Posts de LinkedIn, cada uno en su mensaje para copiarlo desde el móvil."""
+    posts = [p for p in propuestas.listar(propuestas.semana_por_defecto()) if p.meta.get("formato") == "linkedin"
+             and p.estado in ("propuesta", "aprobada")]
+    if not posts:
+        _avisar("✍️ Posts de LinkedIn", "No hay posts esta semana. Lánzalos con `uv run tn redactar --linkedin`.")
+    else:
+        _avisar("✍️ Posts de LinkedIn listos", f"{len(posts)} posts para martes, miércoles y jueves. Te los mando uno a uno.")
+        for n, p in enumerate(posts, start=1):
+            enlace = p.meta.get("enlace_primer_comentario")
+            avisos.enviar_telegram(f"Post {n} · {p.meta.get('titulo')}\n\n{p.cuerpo.strip()}"
+                                   + (f"\n\n🔗 Primer comentario: {enlace}" if enlace else ""))
+    if perfil.hay_propuesta():
+        _avisar("🧭 Perfil editorial", "Hay una propuesta de cambios al Perfil editorial: `uv run tn perfil diff`.")
+
+
+# --- Copia de seguridad --------------------------------------------------------------
+
+
+@app.command("respaldar")
+def cmd_respaldar(
+    destino: Annotated[str | None, typer.Option(help="Carpeta destino (por defecto TN_RESPALDOS o ~/Documents/tech-news-respaldos).")] = None,
+) -> None:
+    """Copia la SQLite y semanas/ (lo que no está en git) a un .tar.gz; conserva las 14 últimas."""
+    archivo = respaldo.respaldar(Path(destino).expanduser() if destino else None)
+    typer.echo(f"Copia de seguridad: {archivo}")
+
+
+# --- Perfil editorial -----------------------------------------------------------------
+
+perfil_app = typer.Typer(help="Revisar el Perfil editorial a partir de tus correcciones.", no_args_is_help=True)
+app.add_typer(perfil_app, name="perfil")
+
+
+@perfil_app.command("decisiones")
+def cmd_perfil_decisiones() -> None:
+    """JSON con tus correcciones desde la última revisión (lo usa el agente)."""
+    conn = _conn()
+    try:
+        _json(perfil.decisiones_pendientes(conn), compacto=True)
+    finally:
+        conn.close()
+
+
+@perfil_app.command("revisar")
+def cmd_perfil_revisar(origen: OpcionOrigen = "manual") -> None:
+    """Propone cambios al Perfil editorial si tus correcciones muestran un patrón. No cambia nada solo."""
+    conn = _conn()
+    try:
+        n = len(perfil.decisiones_pendientes(conn))
+    finally:
+        conn.close()
+    if perfil.hay_propuesta():
+        typer.echo("Ya hay una propuesta pendiente: `tn perfil diff`, `tn perfil aceptar` o `tn perfil rechazar`.")
+        return
+    if n < 3:
+        typer.echo(f"Solo hay {n} correcciones desde la última revisión: no basta para ver un patrón.")
+        return
+    _lanzar_agente("perfil", "", origen)
+    if perfil.hay_propuesta():
+        typer.echo("Propuesta lista: `uv run tn perfil diff`.")
+
+
+@perfil_app.command("diff")
+def cmd_perfil_diff() -> None:
+    """Muestra los cambios propuestos."""
+    try:
+        typer.echo(perfil.diff())
+    except perfil.SinPropuesta as e:
+        _fallar(e)
+
+
+@perfil_app.command("aceptar")
+def cmd_perfil_aceptar() -> None:
+    """Aplica la propuesta a perfil-editorial.md (guarda una copia del anterior en data/)."""
+    conn = _conn()
+    try:
+        perfil.aceptar(conn)
+    except perfil.SinPropuesta as e:
+        _fallar(e)
+    finally:
+        conn.close()
+    typer.echo("perfil-editorial.md actualizado. Recuerda hacer commit del cambio.")
+
+
+@perfil_app.command("rechazar")
+def cmd_perfil_rechazar() -> None:
+    """Descarta la propuesta."""
+    conn = _conn()
+    try:
+        perfil.rechazar(conn)
+    except perfil.SinPropuesta as e:
+        _fallar(e)
+    finally:
+        conn.close()
+    typer.echo("Propuesta descartada.")
+
+
+# --- Horarios ---------------------------------------------------------------------------
+
+horarios_app = typer.Typer(help="Instalar y ver las tareas programadas (launchd).", no_args_is_help=True)
+app.add_typer(horarios_app, name="horarios")
+
+
+@horarios_app.command("estado")
+def cmd_horarios_estado() -> None:
+    """Qué tareas hay, cuándo corren y si están cargadas."""
+    for t in horarios.estado():
+        marca = "●" if t.cargada else ("○" if t.instalada else "·")
+        codigo = f" · último código {t.ultimo_codigo}" if t.ultimo_codigo else ""
+        typer.echo(f"{marca} {t.tarea:<14} {t.cuando:<16} {t.que}{codigo}")
+    typer.echo("● cargada · ○ instalada sin cargar · · sin instalar")
+
+
+@horarios_app.command("instalar")
+def cmd_horarios_instalar() -> None:
+    """Instala (o reinstala) las tareas en ~/Library/LaunchAgents y las carga."""
+    try:
+        hechas = horarios.instalar()
+    except RuntimeError as e:
+        _fallar(e)
+    typer.echo(f"Instaladas {len(hechas)} tareas. Míralas con `uv run tn horarios estado`.")
+
+
+@horarios_app.command("desinstalar")
+def cmd_horarios_desinstalar() -> None:
+    """Quita todas las tareas programadas."""
+    typer.echo(f"Quitadas: {', '.join(horarios.desinstalar()) or 'ninguna'}")
+
+
+@horarios_app.command("lanzar")
+def cmd_horarios_lanzar(tarea: str) -> None:
+    """Ejecuta ya una tarea instalada, a través de launchd (para comprobar que funciona)."""
+    if tarea not in horarios.TAREAS:
+        raise typer.BadParameter(f"Tareas: {', '.join(horarios.TAREAS)}")
+    try:
+        horarios.lanzar_ahora(tarea)
+    except RuntimeError as e:
+        _fallar(e)
+    typer.echo(f"Lanzada. Salida en data/registros/horario-{tarea}.log")
+
+
+@app.command("programado", hidden=True)
+def cmd_programado(tarea: str) -> None:
+    """Punto de entrada de launchd: espera a que no haya nada en curso y ejecuta la tarea."""
+    if tarea not in horarios.TAREAS:
+        raise typer.BadParameter(f"Tareas: {', '.join(horarios.TAREAS)}")
+    typer.echo(f"=== {db.ahora().isoformat(timespec='seconds')} · {tarea} ===")
+    for _ in range(90):  # hasta 90 min: p. ej. al despertar coinciden diario y resumen
+        conn = _conn()
+        try:
+            ocupado = db.ejecuciones_en_curso(conn)
+        finally:
+            conn.close()
+        if not ocupado:
+            break
+        time.sleep(60)
+    acciones = {
+        "diario": lambda: cmd_diario(origen="horario"),
+        "resumen": lambda: cmd_redactar(resumen=True, didactico=True, linkedin=False, semana=None, origen="horario"),
+        "linkedin": lambda: cmd_redactar(resumen=False, didactico=False, linkedin=True, semana=None, origen="horario"),
+        "perfil": lambda: cmd_perfil_revisar(origen="horario"),
+        "aviso-paquete": cmd_avisar_paquete,
+        "aviso-posts": cmd_avisar_posts,
+    }
+    fallo = None
+    try:
+        acciones[tarea]()
+    except (typer.Exit, SystemExit) as e:
+        if getattr(e, "exit_code", getattr(e, "code", 0)) not in (0, None):
+            fallo = "terminó con errores"
+    except Exception as e:  # noqa: BLE001
+        fallo = f"{type(e).__name__}: {e}"
+    if tarea == "diario":
+        try:
+            cmd_respaldar(destino=None)
+        except Exception as e:  # noqa: BLE001
+            fallo = (fallo + " · " if fallo else "") + f"copia de seguridad: {e}"
+    if fallo:
+        _avisar(f"⚠️ tech-news: la tarea {tarea} falló", f"{fallo}\n\nMira `uv run tn ejecuciones` o data/registros/horario-{tarea}.log")
+        raise typer.Exit(1)
+
+
+@app.command("diagnostico")
+def cmd_diagnostico(
+    con_claude: Annotated[bool, typer.Option("--claude", help="Comprueba también que claude responde (gasta muy poca cuota).")] = False,
+) -> None:
+    """Comprueba que todo lo que necesitan los horarios está en su sitio."""
+    def linea(ok: bool, texto: str) -> None:
+        typer.secho(f"{'✓' if ok else '✗'} {texto}", fg=typer.colors.GREEN if ok else typer.colors.RED)
+
+    linea(bool(shutil.which("uv")), f"uv: {shutil.which('uv') or 'no encontrado'}")
+    linea(bool(shutil.which("claude")), f"claude: {shutil.which('claude') or 'no encontrado'}")
+    if con_claude and shutil.which("claude"):
+        r = subprocess.run(["claude", "-p", "Responde solo: ok", "--model", "haiku", "--output-format", "json"],
+                           capture_output=True, text=True, timeout=120, cwd=config.raiz())
+        try:
+            sal = json.loads(r.stdout)
+            linea(not sal.get("is_error"), f"claude responde: {str(sal.get('result'))[:80]}")
+        except json.JSONDecodeError:
+            linea(False, f"claude no responde bien: {(r.stderr or r.stdout)[:120]}")
+    tok, chat = os.environ.get("TN_TELEGRAM_TOKEN"), os.environ.get("TN_TELEGRAM_CHAT")
+    linea(bool(tok and chat), "Telegram configurado" if tok and chat else
+          ("Telegram: falta vincular el chat (`tn avisos vincular`)" if tok else "Telegram: falta TN_TELEGRAM_TOKEN en .env"))
+    cargadas = sum(t.cargada for t in horarios.estado())
+    linea(cargadas == len(horarios.TAREAS), f"Horarios cargados: {cargadas}/{len(horarios.TAREAS)}")
+    copias = sorted(config.ruta_respaldos().glob("tech-news-*.tar.gz"))
+    linea(bool(copias), f"Última copia de seguridad: {copias[-1].name if copias else 'ninguna'} ({config.ruta_respaldos()})")
 
 
 # --- Redactor y Propuestas -------------------------------------------------------

@@ -46,6 +46,11 @@ HERRAMIENTAS = {
         "Read(perfil-editorial.md)",
         "WebFetch",
     ],
+    "perfil": [
+        "Bash(uv run tn perfil decisiones:*)",
+        "Read(perfil-editorial.md)",
+        "Edit(./data/borradores/**)",
+    ],
 }
 
 
