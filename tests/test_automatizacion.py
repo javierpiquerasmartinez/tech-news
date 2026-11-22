@@ -94,7 +94,8 @@ def test_plist_de_cada_tarea(raiz):
         assert "--project" in p["ProgramArguments"]
         assert "/opt/homebrew/bin" in p["EnvironmentVariables"]["PATH"]
     assert horarios.TAREAS["resumen"]["cuando"]["Weekday"] == 4  # jueves
-    assert horarios.cuando_legible(horarios.TAREAS["aviso-posts"]["cuando"]) == "lunes 08:00"
+    assert horarios.cuando_legible(horarios.TAREAS["aviso-paquete"]["cuando"]) == "viernes 08:00"
+    assert horarios.cuando_legible(horarios.TAREAS["post-diario"]["cuando"]) == "lun/mar/mié 16:30"
 
 
 def test_seccion_de_markdown():

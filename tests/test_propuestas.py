@@ -124,3 +124,10 @@ def test_regenerar_el_resumen_no_excluye_lo_que_ya_usaba(conn):
     propuestas.guardar(conn, "resumen", "Resumen v1", "v1", [1, 2])
     ctx = propuestas.contexto(conn, "resumen")
     assert {1, 2} <= {h["id"] for h in ctx["historias_candidatas"]}
+
+
+def test_post_diario_solo_mira_lo_reciente(conn):
+    conn.execute("UPDATE historias SET ultimo_item_en = '2020-01-01T00:00:00+00:00' WHERE id = 2")
+    conn.commit()
+    ids = [h["id"] for h in propuestas.contexto(conn, "linkedin", horas=48)["historias_candidatas"]]
+    assert 2 not in ids and 1 in ids

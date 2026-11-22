@@ -573,6 +573,21 @@ def cmd_avisar_paquete() -> None:
     _avisar("📦 Paquete semanal listo", texto)
 
 
+@avisar_app.command("post")
+def cmd_avisar_post() -> None:
+    """El post de LinkedIn escrito hoy, para publicarlo mañana por la mañana."""
+    hoy = db.ahora().date().isoformat()
+    posts = [p for p in propuestas.listar(propuestas.semana_por_defecto())
+             if p.meta.get("formato") == "linkedin" and str(p.meta.get("creada", "")).startswith(hoy)]
+    if not posts:
+        _avisar("✍️ Post de LinkedIn", "Hoy no se ha escrito post. Lánzalo con `uv run tn redactar --post`.")
+        return
+    for p in posts:
+        enlace = p.meta.get("enlace_primer_comentario")
+        _avisar(f"✍️ Post para mañana · {p.meta.get('titulo')}",
+                p.cuerpo.strip() + (f"\n\n🔗 Primer comentario: {enlace}" if enlace else ""))
+
+
 @avisar_app.command("posts")
 def cmd_avisar_posts() -> None:
     """Lunes: los 3 Posts de LinkedIn, cada uno en su mensaje para copiarlo desde el móvil."""
@@ -635,6 +650,7 @@ def cmd_perfil_revisar(origen: OpcionOrigen = "manual") -> None:
     _lanzar_agente("perfil", "", origen)
     if perfil.hay_propuesta():
         typer.echo("Propuesta lista: `uv run tn perfil diff`.")
+        _avisar("🧭 Perfil editorial", "Hay una propuesta de cambios al Perfil editorial a partir de tus correcciones: `uv run tn perfil diff`.")
 
 
 @perfil_app.command("diff")
@@ -733,11 +749,11 @@ def cmd_programado(tarea: str) -> None:
         time.sleep(60)
     acciones = {
         "diario": lambda: cmd_diario(origen="horario"),
-        "resumen": lambda: cmd_redactar(resumen=True, didactico=True, linkedin=False, semana=None, origen="horario"),
-        "linkedin": lambda: cmd_redactar(resumen=False, didactico=False, linkedin=True, semana=None, origen="horario"),
+        "resumen": lambda: cmd_redactar(resumen=True, didactico=True, linkedin=False, post=False, semana=None, origen="horario"),
+        "post-diario": lambda: (cmd_redactar(resumen=False, didactico=False, linkedin=False, post=True,
+                                             semana=None, origen="horario"), cmd_avisar_post()),
         "perfil": lambda: cmd_perfil_revisar(origen="horario"),
         "aviso-paquete": cmd_avisar_paquete,
-        "aviso-posts": cmd_avisar_posts,
     }
     fallo = None
     try:
@@ -806,11 +822,12 @@ def cmd_redactor_contexto(
     formato: Annotated[str, typer.Option(help=f"{' | '.join(propuestas.FORMATOS)}")],
     historia: Annotated[int | None, typer.Option(help="Para didactico y bomba.")] = None,
     semana: OpcionSemana = None,
+    horas: Annotated[int | None, typer.Option(help="Solo Historias con noticias de las últimas N horas (post diario).")] = None,
 ) -> None:
     """JSON con las Historias candidatas y las Propuestas ya escritas esta semana."""
     conn = _conn()
     try:
-        _json(propuestas.contexto(conn, formato, semana=_semana(semana), historia_id=historia), compacto=True)
+        _json(propuestas.contexto(conn, formato, semana=_semana(semana), historia_id=historia, horas=horas), compacto=True)
     except (propuestas.PropuestaInvalida, historias.AccionInvalida) as e:
         _fallar(e)
     finally:
@@ -861,18 +878,22 @@ def _redactar(formato: str, instrucciones: str, origen: str) -> None:
 @app.command("redactar")
 def cmd_redactar(
     resumen: Annotated[bool, typer.Option("--resumen", help="Guion del Resumen semanal.")] = False,
-    linkedin: Annotated[bool, typer.Option("--linkedin", help="3 Posts de LinkedIn.")] = False,
+    linkedin: Annotated[bool, typer.Option("--linkedin", help="3 Posts de LinkedIn de la semana.")] = False,
+    post: Annotated[bool, typer.Option("--post", help="El post de LinkedIn del día: lo más fuerte de las últimas 48 h.")] = False,
     didactico: Annotated[bool, typer.Option("--didactico", help="3 ideas de Vídeo didáctico.")] = False,
     semana: OpcionSemana = None,
     origen: OpcionOrigen = "manual",
 ) -> None:
     """Redactor: escribe las Propuestas de la Semana editorial."""
     formatos = [f for f, si in (("resumen", resumen), ("ideas-didacticas", didactico), ("linkedin", linkedin)) if si]
-    if not formatos:
-        raise typer.BadParameter("Indica --resumen, --linkedin y/o --didactico")
+    if not formatos and not post:
+        raise typer.BadParameter("Indica --resumen, --post, --linkedin y/o --didactico")
     extra = f"Semana editorial: la que contiene {semana} (pasa --semana {semana} a contexto y guardar)." if semana else ""
     for f in formatos:
         _redactar(f, extra, origen)
+    if post:
+        _redactar("linkedin", "Post diario: escribe UN solo post. Pide el contexto con "
+                  "`uv run tn redactor contexto --formato linkedin --horas 48`.", origen)
 
 
 propuesta_app = typer.Typer(help="Pedir, ver y aprobar Propuestas.", no_args_is_help=True)

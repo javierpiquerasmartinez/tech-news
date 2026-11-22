@@ -78,6 +78,10 @@ Elige **6–8 Historias** de las candidatas. **Todas las Historias en estado `de
 <2–3 líneas + capítulos con minuto aproximado + lista de fuentes>
 ```
 
+### `linkedin`: post diario (lo habitual)
+
+Si te piden el **post diario**, pide el contexto con `uv run tn redactor contexto --formato linkedin --horas 48` y escribe **un solo post** sobre la Historia más fuerte de esas candidatas (primero las destacadas, luego Peso semanal y Urgencia). Las candidatas ya excluyen las Historias con post esta semana. Mismo estilo y reglas que abajo.
+
 ### `linkedin`: 3 Posts de LinkedIn
 
 Prioriza las Historias `destacada` que no tengan post todavía.
