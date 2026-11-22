@@ -1,6 +1,6 @@
-# Voz de jpdev
+# Voz de JP Dev
 
-Cómo suena todo lo que escribe el Redactor. Lo mantiene la persona editora; se afina con el uso ("esto no suena a mí" → se corrige aquí). Nombre provisional del canal: **jpdev**.
+Cómo suena todo lo que escribe el Redactor. Lo mantiene la persona editora; se afina con el uso ("esto no suena a mí" → se corrige aquí). Nombre del canal: **JP Dev** (así, con mayúsculas y espacio). Lema: «Noticias DEV cada semana».
 
 ## Quién habla
 
@@ -30,8 +30,8 @@ Un ingeniero de software senior, full stack, que se ha leído todo lo de la sema
 
 ## Saludo y cierre
 
-- **Saludo:** directo al tema, con una frase que diga de qué va el vídeo. Firma breve: "Soy [nombre], esto es jpdev" o simplemente arrancar con el gancho.
-- **Cierre:** una pregunta concreta al público para los comentarios y una despedida corta ("Nos vemos la semana que viene en jpdev").
+- **Saludo:** directo al tema, con una frase que diga de qué va el vídeo. Firma breve: "Soy [nombre], esto es JP Dev" o simplemente arrancar con el gancho.
+- **Cierre:** una pregunta concreta al público para los comentarios y una despedida corta ("Nos vemos la semana que viene en JP Dev").
 
 ## Por formato
 

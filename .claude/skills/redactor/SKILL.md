@@ -72,7 +72,7 @@ Elige **6–8 Historias** de las candidatas. **Todas las Historias en estado `de
 … (un bloque por Historia)
 
 ## Cierre · literal · ~30 s
-<resumen en una frase, pregunta concreta para comentarios, despedida de jpdev>
+<resumen en una frase, pregunta concreta para comentarios, despedida de JP Dev>
 
 ## Descripción de YouTube
 <2–3 líneas + capítulos con minuto aproximado + lista de fuentes>
