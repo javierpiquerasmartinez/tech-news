@@ -15,7 +15,7 @@ from typing import Annotated
 
 import typer
 
-from tn import agentes, avisos, config, db, historias, horarios, perfil, propuestas, respaldo
+from tn import agentes, avisos, capcut, config, db, historias, horarios, montaje, perfil, propuestas, respaldo
 from tn.fuentes import cargar_fuentes
 from tn.http import Http
 from tn.modelo import ORIGENES, ItemRecogido
@@ -773,6 +773,79 @@ def cmd_programado(tarea: str) -> None:
         raise typer.Exit(1)
 
 
+# --- Montador (fase 2) -------------------------------------------------------------------
+
+montaje_app = typer.Typer(help="Preparar el Montador: requisitos y plantillas de CapCut.", no_args_is_help=True)
+app.add_typer(montaje_app, name="montaje")
+
+
+def _requisitos_montador() -> bool:
+    todo = True
+    for r in capcut.requisitos():
+        typer.secho(f"{'✓' if r.ok else '✗'} {r.texto}", fg=typer.colors.GREEN if r.ok else typer.colors.RED)
+        if not r.ok:
+            typer.echo(f"    → {r.arreglo}")
+            todo = False
+    return todo
+
+
+@montaje_app.command("requisitos")
+def cmd_montaje_requisitos() -> None:
+    """Comprueba que CapCut, capcut-kit y las herramientas del Montador están listos."""
+    if not _requisitos_montador():
+        raise typer.Exit(1)
+
+
+@montaje_app.command("plantillas")
+def cmd_montaje_plantillas(
+    desde: Annotated[str, typer.Option(help="Nombre del proyecto de CapCut que tiene al menos un texto.")],
+) -> None:
+    """Saca de un proyecto real de CapCut las plantillas de texto que necesita capcut-kit."""
+    try:
+        for ruta in capcut.extraer_plantillas(desde):
+            typer.echo(f"Escrita {ruta}")
+    except capcut.CapCutNoDisponible as e:
+        _fallar(e)
+
+
+@montaje_app.command("doctor")
+def cmd_montaje_doctor() -> None:
+    """Comprobación de solo lectura de capcut-kit contra tu CapCut (no toca proyectos)."""
+    try:
+        r = capcut.ejecutar("doctor", timeout=120)
+    except capcut.CapCutNoDisponible as e:
+        _fallar(e)
+    typer.echo(r.stdout + r.stderr)
+    if r.returncode != 0:
+        raise typer.Exit(1)
+
+
+@app.command("montar")
+def cmd_montar(
+    semana: Annotated[str, typer.Option(help="Semana editorial del guion (cualquier día, AAAA-MM-DD).")],
+    hasta: Annotated[str, typer.Option(help=f"Último paso: {' | '.join(montaje.PASOS)}.")] = "transcribir",
+    rehacer: Annotated[str | None, typer.Option(help="Rehacer desde este paso aunque ya esté hecho.")] = None,
+    origen: OpcionOrigen = "manual",
+) -> None:
+    """Montador: de tu Grabación a un Montaje de CapCut (por ahora: preparar y transcribir)."""
+    _validar_origen(origen)
+    inicio = _semana(semana)
+    conn = _conn()
+    eid = db.abrir_ejecucion(conn, f"montar {inicio.isoformat()} --hasta {hasta}", origen, db.ahora())
+    try:
+        res = montaje.montar(inicio, hasta=hasta, rehacer=rehacer,
+                             al_avanzar=lambda p: typer.echo(f"→ {p}…"))
+    except montaje.MontajeInvalido as e:
+        db.cerrar_ejecucion(conn, eid, "fallida", resultado=str(e))
+        conn.close()
+        _fallar(e)
+    db.cerrar_ejecucion(conn, eid, "ok", resultado=json.dumps(res, ensure_ascii=False))
+    conn.close()
+    for paso, detalle in res.items():
+        typer.echo(f"✓ {paso}: {detalle}")
+    typer.echo(f"Carpeta del Montaje: {montaje.carpeta(inicio)}")
+
+
 @app.command("diagnostico")
 def cmd_diagnostico(
     con_claude: Annotated[bool, typer.Option("--claude", help="Comprueba también que claude responde (gasta muy poca cuota).")] = False,
@@ -796,6 +869,8 @@ def cmd_diagnostico(
           ("Telegram: falta vincular el chat (`tn avisos vincular`)" if tok else "Telegram: falta TN_TELEGRAM_TOKEN en .env"))
     cargadas = sum(t.cargada for t in horarios.estado())
     linea(cargadas == len(horarios.TAREAS), f"Horarios cargados: {cargadas}/{len(horarios.TAREAS)}")
+    faltan = [r.texto for r in capcut.requisitos() if not r.ok]
+    linea(not faltan, "Montador listo" if not faltan else f"Montador: falta {', '.join(faltan)} (`tn montaje requisitos`)")
     copias = sorted(config.ruta_respaldos().glob("tech-news-*.tar.gz"))
     linea(bool(copias), f"Última copia de seguridad: {copias[-1].name if copias else 'ninguna'} ({config.ruta_respaldos()})")
 

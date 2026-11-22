@@ -257,7 +257,8 @@ flowchart LR
 - **Generación con IA (Gemini: imagen, vídeo, voz):** solo cuando no hay nada real que enseñar y **siempre con tu aprobación previa en cada uso**. El Montador propone qué generaría, con un prompt y su coste estimado; nada se genera hasta que dices que sí. La clave va en `.env` como `TN_GEMINI_API_KEY`.
 - **Música y efectos:** de la Biblioteca de audio de YouTube, en `~/Movies/jpdev/audio/musica/` y `~/Movies/jpdev/audio/efectos/`.
 - **Iteración:** v1 → tu feedback (con minuto) → v2… Una vez retocado a mano en CapCut, el Montador solo **añade**.
-- **Requisitos:** CapCut instalado en este Mac, `~/git/jpdev/capcut-kit` clonado con sus `capcut-templates/`, ffmpeg y node.
+- **Requisitos:** CapCut instalado en este Mac, `~/git/jpdev/capcut-kit` clonado en el commit fijado (`TN_CAPCUT_KIT` para otra ruta) con sus `capcut-templates/`, ffmpeg y node. Compruébalo con `uv run tn montaje requisitos`; las plantillas se sacan de un proyecto tuyo con un texto: `uv run tn montaje plantillas --desde <proyecto>`. Tras actualizar CapCut: `uv run tn montaje doctor`.
+- **Uso:** `uv run tn montar --semana 2026-11-13 [--hasta <paso>] [--rehacer <paso>]`. Cada paso queda apuntado en `estado.json` de la carpeta del Montaje: relanzar retoma donde se quedó. La transcripción usa los nombres propios del guion como pista para acertar con los términos técnicos.
 
 ## 10. Hoja de ruta (fase 1)
 
