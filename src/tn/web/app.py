@@ -9,6 +9,7 @@ comando equivalente (ADR-0004).
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 from contextlib import contextmanager
 from datetime import datetime, timedelta
@@ -20,6 +21,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 import markdown as md
+import yaml
 
 from tn import config, db, historias, propuestas
 from tn.fuentes import cargar_fuentes
@@ -208,9 +210,60 @@ def separar(request: Request, hid: int, items: list[int] = Form([]), titulo: str
 # --- Propuestas ---------------------------------------------------------------------
 
 
+_NOMBRES_GRAFICO = {"rotulo": "Rótulo", "tabla": "Tabla", "pasos": "Pasos", "captura": "Captura de fuente"}
+_BLOQUE_GRAFICOS = re.compile(r"^[ \t]*(?:~~~|```)graficos[ \t]*\n(.*?)^[ \t]*(?:~~~|```)[ \t]*$", re.M | re.S)
+
+
+def _grafico_legible(g: dict) -> str:
+    """Una línea de Markdown por Gráfico previsto: qué es, cuándo entra y qué se verá."""
+    d = g.get("datos") or {}
+    tipo = _NOMBRES_GRAFICO.get(g.get("tipo"), str(g.get("tipo")))
+    alerta = " · 🔴 alerta" if d.get("tono") == "alerta" else ""
+    if g.get("tipo") == "rotulo":
+        que = f"**{d.get('valor', '')}** · {d.get('etiqueta', '')}" + (f" · _{d['detalle']}_" if d.get("detalle") else "")
+    elif g.get("tipo") == "tabla":
+        filas = "; ".join(" · ".join(map(str, f)) for f in d.get("filas", []))
+        que = f"**{d.get('titulo', '')}** ({' · '.join(map(str, d.get('columnas', [])))}): {filas}"
+    elif g.get("tipo") == "pasos":
+        que = f"**{d.get('titulo', '')}**: " + " → ".join(f"{i}. {p}" for i, p in enumerate(d.get("pasos", []), 1))
+    elif g.get("tipo") == "captura":
+        que = f"{d.get('fuente', '')} · {d.get('url', '')}" + (f" · «{d['cita']}»" if d.get("cita") else "")
+    else:
+        que = str(d)
+    return f"- 🎬 **{tipo}**{alerta} · entra con «{g.get('ancla', '')}» → {que}"
+
+
+def _graficos_legibles(cuerpo: str) -> str:
+    def sustituir(m: re.Match) -> str:
+        try:
+            lista = yaml.safe_load(m.group(1)) or []
+            lineas = [_grafico_legible(g) for g in lista if isinstance(g, dict)]
+        except yaml.YAMLError:
+            return "\n```\n" + m.group(1) + "```\n"
+        return "\n" + "\n".join(lineas) + "\n"
+    return _BLOQUE_GRAFICOS.sub(sustituir, cuerpo)
+
+
+def _separar_lineas(cuerpo: str) -> str:
+    """Los guiones ponen listas y etiquetas («**Fuentes:** …») justo debajo de otra línea; el
+    Markdown estricto las pegaría al párrafo anterior. Se les da su propia línea en blanco."""
+    res, en_codigo = [], False
+    for linea in cuerpo.splitlines():
+        if linea.strip().startswith(("```", "~~~")):
+            en_codigo = not en_codigo
+        empieza_bloque = linea.lstrip().startswith(("- ", "* ", "**")) or re.match(r"\s*\d+\. ", linea)
+        previa = res[-1] if res else ""
+        previa_es_lista = previa.lstrip().startswith(("- ", "* ")) or re.match(r"\s*\d+\. ", previa)
+        if not en_codigo and empieza_bloque and previa.strip() and not (previa_es_lista and not linea.lstrip().startswith("**")):
+            res.append("")
+        res.append(linea)
+    return "\n".join(res)
+
+
 def _html(cuerpo: str) -> str:
     # El texto lo escribe un agente a partir de contenido web: sin HTML crudo.
-    return md.markdown(cuerpo.replace("<", "&lt;"), extensions=["sane_lists"])
+    texto = _separar_lineas(_graficos_legibles(cuerpo)).replace("<", "&lt;")
+    return md.markdown(texto, extensions=["sane_lists", "fenced_code"])
 
 
 def _tarjeta_propuesta(request: Request, ruta: Path, error: str | None = None, editando: bool = False) -> HTMLResponse:

@@ -131,3 +131,34 @@ def test_post_diario_solo_mira_lo_reciente(conn):
     conn.commit()
     ids = [h["id"] for h in propuestas.contexto(conn, "linkedin", horas=48)["historias_candidatas"]]
     assert 2 not in ids and 1 in ids
+
+
+def test_la_ficha_de_feedback_no_es_una_propuesta(conn, tmp_path):
+    p = propuestas.guardar(conn, "resumen", "Resumen", "v1", [1])
+    (p.ruta.parent / "montaje-feedback.md").write_text("# Ficha\n\n- v1 · 00:10 · algo · 2026-11-22\n")
+    assert [x.ruta.name for x in propuestas.listar(propuestas.inicio_semana(date.today()))] == ["resumen-semanal.md"]
+
+
+def test_los_graficos_del_guion_se_ven_legibles():
+    from tn.web.app import _html
+    cuerpo = """## 1. NGINX
+**Gráficos:**
+~~~graficos
+- tipo: rotulo
+  ancla: "CVSS 4.0 de 9.2"
+  datos: {etiqueta: "CVE-2026-1", valor: "9.2", tono: alerta}
+- tipo: pasos
+  ancla: "si no puedes"
+  datos: {titulo: "Qué hacer", pasos: ["Actualiza", "Reinicia"]}
+~~~
+**Transición · literal:** Seguimos.
+"""
+    html = _html(cuerpo)
+    assert "~~~" not in html and "tipo:" not in html
+    assert "<li>" in html and "<strong>9.2</strong>" in html and "Seguimos." in html
+
+
+def test_listas_y_etiquetas_pegadas_se_separan():
+    from tn.web.app import _html
+    html = _html("**Entrada · literal:** Hola.\n- punto uno\n- punto dos\n**Fuentes:** https://x.example\n")
+    assert html.count("<li>") == 2 and "<p><strong>Fuentes:</strong>" in html
