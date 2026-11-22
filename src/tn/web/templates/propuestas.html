@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block titulo %}Propuestas{% endblock %}
+{% block contenido %}
+<div class="cabecera-pagina">
+  <div>
+    <h1>Propuestas</h1>
+    <p class="sub">Semana editorial del {{ inicio.strftime('%d/%m') }} al {{ fin.strftime('%d/%m') }} · {{ tarjetas|length }} Propuestas · nada se publica sin tu aprobación</p>
+  </div>
+  <div class="filtros">
+    <form method="get" action="/propuestas" class="en-linea">
+      <label for="semana">Semana</label>
+      <select id="semana" name="semana" onchange="this.form.submit()">
+        {% for s in semanas %}<option value="{{ s }}" {% if s == inicio.isoformat() %}selected{% endif %}>{{ s }}</option>{% endfor %}
+      </select>
+    </form>
+  </div>
+</div>
+
+<div class="filtros barra-redactor">
+  {% for f, etiqueta in [('resumen', 'Escribir Resumen semanal'), ('linkedin', 'Escribir 3 posts de LinkedIn'), ('didactico', 'Proponer 3 ideas didácticas')] %}
+    <form method="post" action="/lanzar-redactor">
+      <input type="hidden" name="formato" value="{{ f }}">
+      <button class="boton" {% if en_curso %}disabled{% endif %}>{{ etiqueta }}</button>
+    </form>
+  {% endfor %}
+</div>
+
+{% if not tarjetas %}
+  <div class="vacio">
+    <p><strong>Todavía no hay Propuestas esta semana.</strong></p>
+    <p>Lánzalas con los botones de arriba o con <code>uv run tn redactar --resumen --linkedin --didactico</code>.</p>
+  </div>
+{% else %}
+  <div class="lista">
+    {% for t in tarjetas %}
+      {% with p=t['p'], html=t['html'], siguientes=t['siguientes'], error=None, editando=False %}
+        {% include "_propuesta.html" %}
+      {% endwith %}
+    {% endfor %}
+  </div>
+{% endif %}
+{% endblock %}

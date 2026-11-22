@@ -36,6 +36,16 @@ HERRAMIENTAS = {
         "WebFetch",
         "WebSearch",
     ],
+    "redactor": [
+        "Bash(uv run tn redactor:*)",
+        "Bash(uv run tn historia ver:*)",
+        # Los textos largos no pasan bien como argumento del shell: el Redactor escribe un
+        # borrador aquí y `tn redactor guardar --desde` lo recoge.
+        "Edit(./data/borradores/**)",
+        "Read(voz.md)",
+        "Read(perfil-editorial.md)",
+        "WebFetch",
+    ],
 }
 
 

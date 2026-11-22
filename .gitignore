@@ -8,3 +8,6 @@ data/
 
 # Secretos (token de Telegram, etc.)
 .env
+
+# Capa humana (Propuestas): fuera de git mientras el repo sea público (ADR-0003)
+semanas/

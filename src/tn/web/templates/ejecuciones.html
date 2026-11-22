@@ -20,7 +20,7 @@
 {% if lanzada == 'ocupado' %}
   <p class="aviso">Ya hay una Ejecución en curso. Espera a que termine.</p>
 {% elif lanzada %}
-  <p class="aviso ok">Lanzado <code>tn {{ lanzada }} --origen web</code>. Recarga para ver cómo avanza; los agentes tardan unos minutos.</p>
+  <p class="aviso ok">Lanzado <code>tn {{ lanzada|replace('-', ' --', 1) if lanzada.startswith('redactar') else lanzada }} --origen web</code>. Recarga para ver cómo avanza; los agentes tardan unos minutos.</p>
 {% endif %}
 
 <div class="tabla-contenedor">

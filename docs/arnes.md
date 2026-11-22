@@ -175,7 +175,7 @@ Toda acción pasa por la CLI `tn` ([ADR-0004](adr/0004-cli-unica-como-punto-de-e
 | Fusionar / separar | `tn historia fusionar <a> <b>` · `tn historia separar <id> --items 3,4 --titulo …` | "estas dos son la misma" | Fusionar / Separar |
 | Propuesta fuera de calendario | `tn propuesta pedir <id> --formato …` | "hazme un post de esto ya" | Pedir Propuesta |
 | Generar el paquete semanal antes | `tn redactar --resumen` | `/redactar` | Ejecuciones |
-| Aprobar / descartar una Propuesta | `tn propuesta estado <fichero> aprobada` | "apruebo el post 2" | Propuestas |
+| Ver / aprobar / descartar una Propuesta | `tn propuestas` · `tn propuesta ver <fichero>` · `tn propuesta estado <fichero> aprobada` | "apruebo el post 2" | Propuestas |
 | Revisar la semana con criterio | — | `/revisar-semana` | — |
 | Afinar el Perfil editorial | `tn perfil revisar` | "esta semana sobraba cripto" | — |
 | Ver qué ha fallado | `tn ejecuciones` | "¿qué tal fue la última ejecución?" | Ejecuciones / Fuentes |
@@ -202,20 +202,22 @@ tech-news/
 ├── perfil-editorial.md       ← tu criterio; el Editor lo lee siempre
 ├── voz.md                    ← tu tono; el Redactor lo lee siempre
 ├── semanas/
-│   └── 2026-11-20/           ← una carpeta por Semana editorial (viernes de inicio)
+│   └── 2026-11-20/           ← una carpeta por Semana editorial (viernes de inicio); fuera de git
 │       ├── resumen-semanal.md
 │       ├── ideas-didacticas.md
 │       ├── linkedin-1.md … linkedin-3.md
 │       └── bomba-<slug>.md
 ├── data/                     ← fuera de git
-│   └── tech-news.db          ← Items, Historias, puntuaciones, Ejecuciones, decisiones
+│   ├── tech-news.db          ← Items, Historias, puntuaciones, Ejecuciones, decisiones
+│   ├── borradores/           ← donde el Redactor deja cada texto antes de `tn redactor guardar --desde`
+│   └── registros/            ← salida de lo lanzado desde la web
 ├── src/tn/                   ← CLI, Recolector, interfaz web
 ├── .claude/skills/           ← explorador · editor · redactor · revisar-semana
 ├── launchd/                  ← plists de los horarios
 └── docs/                     ← este documento, ADRs, investigación
 ```
 
-Dos capas ([ADR-0003](adr/0003-dos-capas-de-datos.md)): la **máquina** (SQLite, fuera de git, copia diaria comprimida) y la **humana** (Markdown versionado). Cada Propuesta lleva en su cabecera `estado` y las Historias en que se basa.
+Dos capas ([ADR-0003](adr/0003-dos-capas-de-datos.md)): la **máquina** (SQLite, fuera de git, copia diaria comprimida) y la **humana** (Markdown en `semanas/`, también fuera de git porque el repo es público; entra en la misma copia diaria). Cada Propuesta lleva en su cabecera `estado` y las Historias en que se basa.
 
 ## 9. Fase 2: el Montador (por diseñar)
 

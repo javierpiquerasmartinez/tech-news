@@ -1,0 +1,40 @@
+{% set ident = 'p-' ~ (p.ruta.stem) %}
+<article class="propuesta estado-p-{{ p.estado }}" id="{{ ident }}">
+  <div class="historia-meta">
+    <span class="chip formato">{{ formatos.get(p.meta.get('formato'), '?') }}</span>
+    <span class="salud salud-{{ {'propuesta':'sin-datos','aprobada':'ok','descartada':'pausada','publicada':'explorador'}[p.estado] }}">{{ p.estado }}</span>
+    <span class="tenue">Historias {% for h in p.meta.get('historias', []) %}#{{ h }}{% if not loop.last %}, {% endif %}{% endfor %} · {{ p.relativa }}</span>
+  </div>
+  <h2 class="historia-titulo">{{ p.meta.get('titulo') }}</h2>
+  {% if p.meta.get('enlace_primer_comentario') %}
+    <p class="tenue">Enlace para el primer comentario: <a href="{{ p.meta['enlace_primer_comentario'] }}" target="_blank" rel="noopener">{{ p.meta['enlace_primer_comentario'] }}</a></p>
+  {% endif %}
+  {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+
+  <div class="acciones">
+    {% for s in siguientes %}
+      <button class="boton{% if s == 'aprobada' %} primario{% endif %}" hx-post="/propuesta/estado" hx-vals='{"f": "{{ p.relativa }}", "estado": "{{ s }}"}' hx-target="#{{ ident }}" hx-swap="outerHTML">
+        {{ {'aprobada':'Aprobar','descartada':'Descartar','publicada':'Marcar publicada','propuesta':'Volver a propuesta'}[s] }}
+      </button>
+    {% endfor %}
+    {% if p.estado != 'publicada' and not editando %}
+      <button class="boton" hx-get="/propuesta?f={{ p.relativa|urlencode }}&editar=true" hx-target="#{{ ident }}" hx-swap="outerHTML">Editar</button>
+    {% endif %}
+  </div>
+
+  {% if editando %}
+    <form class="editor-propuesta" hx-post="/propuesta/editar" hx-target="#{{ ident }}" hx-swap="outerHTML">
+      <input type="hidden" name="f" value="{{ p.relativa }}">
+      <textarea name="cuerpo" rows="22" aria-label="Contenido en Markdown" id="t-{{ ident }}">{{ p.cuerpo }}</textarea>
+      <div class="en-linea">
+        <button class="boton primario">Guardar</button>
+        <button class="boton" type="button" hx-get="/propuesta?f={{ p.relativa|urlencode }}" hx-target="#{{ ident }}" hx-swap="outerHTML">Cancelar</button>
+      </div>
+    </form>
+  {% else %}
+    <details class="detalle" {% if p.meta.get('formato') == 'linkedin' %}open{% endif %}>
+      <summary>Leer</summary>
+      <div class="markdown">{{ html|safe }}</div>
+    </details>
+  {% endif %}
+</article>
