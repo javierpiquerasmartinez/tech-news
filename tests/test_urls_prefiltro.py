@@ -42,3 +42,10 @@ def test_misma_url_en_fuentes_distintas_no_es_duplicado_del_prefiltro():
     res = prefiltrar([_item("https://a.example/1", fuente="f1"), _item("https://a.example/1", fuente="f2")])
     assert len(res.aceptados) == 2
     assert res.aceptados[0].url_normalizada == res.aceptados[1].url_normalizada
+
+
+def test_conservar_fragmento_distingue_entradas_de_un_changelog():
+    a = "https://aistudio.google.com/docs/changelog#2026-11-19-genie-4"
+    b = "https://aistudio.google.com/docs/changelog#2026-11-18-tool-retrieval"
+    assert normalizar_url(a) == normalizar_url(b)
+    assert normalizar_url(a, conservar_fragmento=True) != normalizar_url(b, conservar_fragmento=True)
