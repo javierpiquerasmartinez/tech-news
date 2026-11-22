@@ -1,0 +1,29 @@
+<!doctype html>
+<!-- Cabecera de bloque: número + título, tercio inferior izquierdo. Persona editora a pantalla completa. -->
+<html data-composition-variables='[{"id":"datos","type":"string","label":"JSON","default":"{\"numero\":\"1\",\"titulo\":\"Título del bloque\"}"}]'>
+<head><meta charset="utf-8"><link rel="stylesheet" href="comun.css">
+<style>
+.cab { position: absolute; left: var(--margen); bottom: 120px; display: flex; align-items: stretch;
+       border-radius: var(--radio); overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,.35); }
+.num { background: var(--acento); color: var(--noche); font-weight: 900; font-size: 64px; padding: 14px 28px;
+       display: flex; align-items: center; }
+.tit { background: var(--noche); font-weight: 700; font-size: 50px; padding: 18px 34px 20px; max-width: 1200px;
+       display: flex; align-items: center; letter-spacing: -0.01em; }
+</style></head>
+<body>
+<div id="root" data-composition-id="root" data-width="1920" data-height="1080" data-start="0" data-duration="__DURACION__">
+  <div class="cab"><div class="num" id="num"></div><div class="tit" id="tit"></div></div>
+</div>
+<script src="node_modules/gsap/dist/gsap.min.js"></script>
+<script>
+const d = JSON.parse(window.__hyperframes.getVariables().datos);
+const D = __DURACION__;
+document.getElementById("num").textContent = d.numero;
+document.getElementById("tit").textContent = d.titulo;
+const tl = gsap.timeline({ paused: true });
+tl.fromTo(".cab", { opacity: 0, x: -60 }, { opacity: 1, x: 0, duration: 0.4, ease: "power3.out" }, 0)
+  .fromTo(".tit", { clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0% 0 0)", duration: 0.45, ease: "power3.out" }, 0.1)
+  .to(".cab", { opacity: 0, x: -30, duration: 0.3, ease: "power2.in" }, D - 0.35);
+window.__timelines = window.__timelines || {}; window.__timelines["root"] = tl;
+</script>
+</body></html>

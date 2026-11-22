@@ -48,6 +48,12 @@ HERRAMIENTAS = {
         "Read(perfil-editorial.md)",
         "WebFetch",
     ],
+    "montador-graficos": [
+        "Bash(uv run tn montaje frases:*)",
+        "Bash(uv run tn montaje graficos-plan:*)",
+        "Read(estilo-edicion.md)",
+        "Edit(./data/borradores/**)",
+    ],
     "perfil": [
         "Bash(uv run tn perfil decisiones:*)",
         "Read(perfil-editorial.md)",

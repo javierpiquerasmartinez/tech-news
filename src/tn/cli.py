@@ -866,20 +866,52 @@ def cmd_montaje_previa(semana: Annotated[str, typer.Option(help="Semana editoria
     typer.echo(f"Vista previa del Corte: {ruta}")
 
 
+@montaje_app.command("frases")
+def cmd_montaje_frases(semana: Annotated[str, typer.Option(help="Semana editorial del Montaje.")]) -> None:
+    """JSON para el agente de Gráficos: por bloque, ventana de tiempo, Visual, Fuentes y frases."""
+    try:
+        _json(montaje.contexto_graficos(montaje.Montaje(_semana(semana))), compacto=True)
+    except (montaje.MontajeInvalido, FileNotFoundError) as e:
+        _fallar(e)
+
+
+@montaje_app.command("graficos-plan")
+def cmd_montaje_graficos_plan(
+    fichero: Annotated[str, typer.Argument(help="JSON del plan (lo usa el agente, en data/borradores/).")],
+    semana: Annotated[str, typer.Option(help="Semana editorial del Montaje.")],
+) -> None:
+    """Valida y guarda el plan de rótulos, infografías y capturas."""
+    from tn import graficos
+
+    ruta = (config.raiz() / fichero).resolve()
+    try:
+        datos = json.loads(ruta.read_text(encoding="utf-8"))
+        plan = datos.get("graficos", datos) if isinstance(datos, dict) else datos
+        avisos = montaje.guardar_plan_graficos(montaje.Montaje(_semana(semana)), plan)
+    except (json.JSONDecodeError, FileNotFoundError, graficos.PlanInvalido, montaje.MontajeInvalido) as e:
+        _fallar(e)
+    if (config.ruta_db().parent / "borradores").resolve() in ruta.parents:
+        ruta.unlink(missing_ok=True)
+    typer.echo(f"Plan guardado ({len(plan)} Gráficos).")
+    for a in avisos:
+        typer.secho(f"⚠ {a}", fg=typer.colors.YELLOW)
+
+
 @app.command("montar")
 def cmd_montar(
     semana: Annotated[str, typer.Option(help="Semana editorial del guion (cualquier día, AAAA-MM-DD).")],
     hasta: Annotated[str, typer.Option(help=f"Último paso: {' | '.join(montaje.PASOS)}.")] = "cortar",
     rehacer: Annotated[str | None, typer.Option(help="Rehacer desde este paso aunque ya esté hecho.")] = None,
+    sin_agente: Annotated[bool, typer.Option("--sin-agente", help="Gráficos: solo cabeceras, sello y final (no gasta cuota).")] = False,
     origen: OpcionOrigen = "manual",
 ) -> None:
-    """Montador: de tu Grabación a un Montaje de CapCut (por ahora: preparar, transcribir y cortar)."""
+    """Montador: de tu Grabación a un Montaje de CapCut (por ahora hasta los Gráficos)."""
     _validar_origen(origen)
     inicio = _semana(semana)
     conn = _conn()
     eid = db.abrir_ejecucion(conn, f"montar {inicio.isoformat()} --hasta {hasta}", origen, db.ahora())
     try:
-        res = montaje.montar(inicio, hasta=hasta, rehacer=rehacer,
+        res = montaje.montar(inicio, hasta=hasta, rehacer=rehacer, con_agente=not sin_agente, origen=origen,
                              al_avanzar=lambda p: typer.echo(f"→ {p}…"))
     except montaje.MontajeInvalido as e:
         db.cerrar_ejecucion(conn, eid, "fallida", resultado=str(e))

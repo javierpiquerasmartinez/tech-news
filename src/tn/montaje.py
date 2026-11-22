@@ -17,7 +17,7 @@ from pathlib import Path
 from tn.db import _iso, ahora
 
 PASOS = ("preparar", "transcribir", "cortar", "graficos", "ensamblar", "revisar")
-IMPLEMENTADOS = ("preparar", "transcribir", "cortar")
+IMPLEMENTADOS = ("preparar", "transcribir", "cortar", "graficos")
 EXTENSIONES = (".mp4", ".mov", ".m4v", ".mkv")
 
 # Voz: paso alto, ruido suave fuera, compresión ligera, y −14 LUFS (estándar de YouTube).
@@ -84,6 +84,11 @@ class Montaje:
         a["mantener"] = sorted((set(a["mantener"]) | set(mantener)) - set(quitar))
         (self.carpeta / "ajustes-corte.json").write_text(json.dumps(a, indent=1))
         return a
+
+    @property
+    def plan_graficos(self) -> Path:
+        """Gráficos que decide el agente (rótulos, infografías, capturas)."""
+        return self.carpeta / "plan-graficos.json"
 
     @property
     def trabajo(self) -> str:
@@ -237,10 +242,73 @@ def cortar(m: "Montaje") -> dict:
     }
 
 
+# --- 4. Gráficos ---------------------------------------------------------------------------
+
+
+def contexto_graficos(m: "Montaje") -> dict:
+    from tn import graficos
+
+    if not m.corte.is_file():
+        raise MontajeInvalido("Aún no hay Corte: primero `tn montar --hasta cortar`")
+    corte_ = json.loads(m.corte.read_text())
+    trans = json.loads((m.carpeta / "transcripcion-corte.json").read_text())
+    return graficos.contexto_agente(corte_, trans, m.guion())
+
+
+def guardar_plan_graficos(m: "Montaje", plan: list[dict]) -> list[str]:
+    """Valida el plan del agente (sin estructurales) y lo guarda. Devuelve avisos."""
+    from tn import graficos
+
+    duracion = json.loads(m.corte.read_text())["duracion_corte"]
+    prohibidos = [g for g in plan if g.get("tipo") in ("cabecera", "sello", "final")]
+    if prohibidos:
+        raise graficos.PlanInvalido("Cabeceras, sello y pantalla final los pone el código: quítalos del plan")
+    validado = graficos.validar(plan, duracion)
+    m.plan_graficos.write_text(json.dumps(validado, ensure_ascii=False, indent=1))
+    completo = graficos.validar(validado + graficos.estructurales(json.loads(m.corte.read_text())), duracion)
+    return graficos.solapes(completo)
+
+
+def hacer_graficos(m: "Montaje", con_agente: bool = True, origen: str = "manual", al_avanzar=None) -> dict:
+    from tn import agentes, capcut, config, db, graficos
+
+    if con_agente and not m.plan_graficos.is_file():
+        if al_avanzar:
+            al_avanzar("graficos: el agente decide rótulos, infografías y capturas")
+        conn = db.conectar(config.ruta_db())
+        try:
+            r = agentes.lanzar(conn, "montador-graficos", f"Semana: {m.semana.isoformat()}.", origen=origen)
+        finally:
+            conn.close()
+        if r.estado != "ok" or not m.plan_graficos.is_file():
+            raise MontajeInvalido(f"El agente no dejó plan de Gráficos: {r.resultado[-400:]}")
+    corte_ = json.loads(m.corte.read_text())
+    propios = json.loads(m.plan_graficos.read_text()) if m.plan_graficos.is_file() else []
+    plan = graficos.validar(propios + graficos.estructurales(corte_), corte_["duracion_corte"])
+    trabajo = capcut.carpeta_trabajos() / m.trabajo
+    hechos, fallidos = [], []
+    for g in plan:
+        if al_avanzar:
+            al_avanzar(f"graficos: {g['id']}")
+        try:
+            graficos.renderizar(g, m.carpeta / "graficos", trabajo / "assets")
+            hechos.append(g)
+        except graficos.PlanInvalido as e:
+            fallidos.append(f"{g['id']}: {e}")
+    # Lo que `capcut-bridge.py graphics` lee (INPUT-CONTRACT.md del kit)
+    (trabajo / "graphics-plan.json").write_text(json.dumps(
+        {"graphics": [{"id": g["id"], "file": f"{g['id']}.mov", "start": g["inicio"], "tipo": g["tipo"],
+                       "duracion": g["duracion"]} for g in hechos]}, ensure_ascii=False, indent=1))
+    (m.carpeta / "graficos.json").write_text(json.dumps(plan, ensure_ascii=False, indent=1))
+    return {"graficos": len(hechos), "fallidos": fallidos, "solapes": graficos.solapes(plan),
+            "por_tipo": {t: sum(g["tipo"] == t for g in hechos) for t in graficos.DURACIONES}}
+
+
 # --- Orquestación ------------------------------------------------------------------------
 
 
-def montar(semana: date, hasta: str = "cortar", rehacer: str | None = None, al_avanzar=None) -> dict:
+def montar(semana: date, hasta: str = "cortar", rehacer: str | None = None, al_avanzar=None,
+           con_agente: bool = True, origen: str = "manual") -> dict:
     """Ejecuta los pasos en orden hasta `hasta`; se salta los hechos salvo desde `rehacer`."""
     if hasta not in PASOS:
         raise MontajeInvalido(f"Paso desconocido: {hasta}. Pasos: {', '.join(PASOS)}")
@@ -265,22 +333,46 @@ def montar(semana: date, hasta: str = "cortar", rehacer: str | None = None, al_a
             detalle["con_vocabulario_del_guion"] = bool(guion)
         elif paso == "cortar":
             detalle = cortar(m)
+        elif paso == "graficos":
+            detalle = hacer_graficos(m, con_agente=con_agente, origen=origen, al_avanzar=al_avanzar)
         m.marcar(paso, **detalle)
         resultados[paso] = detalle
     return resultados
 
 
 def previa_corte(m: Montaje) -> Path:
-    """MP4 rápido del Corte (sin Gráficos) para escucharlo antes de ir a CapCut."""
+    """MP4 rápido del Corte, con los Gráficos encima si ya están hechos, para verlo sin CapCut.
+
+    No es el montaje final (sin círculo, música ni efectos): sirve para revisar ritmo y tiempos.
+    """
+    from tn import capcut
+
     datos = json.loads(m.corte.read_text())
     partes, ref = [], []
     for i, t in enumerate(datos["tramos"]):
-        partes.append(f"[0:v]trim={t['inicio']}:{t['fin']},setpts=PTS-STARTPTS,fps=30,scale=-2:720[v{i}];"
+        partes.append(f"[0:v]trim={t['inicio']}:{t['fin']},setpts=PTS-STARTPTS,fps=30,scale=1920:1080[v{i}];"
                       f"[0:a]atrim={t['inicio']}:{t['fin']},asetpts=PTS-STARTPTS[a{i}];")
         ref.append(f"[v{i}][a{i}]")
-    filtro = "".join(partes) + "".join(ref) + f"concat=n={len(ref)}:v=1:a=1[v][a]"
+    filtro = "".join(partes) + "".join(ref) + f"concat=n={len(ref)}:v=1:a=1[base][aud];"
+    entradas = ["-i", str(m.limpia)]
+    plan = json.loads((m.carpeta / "graficos.json").read_text()) if (m.carpeta / "graficos.json").is_file() else []
+    assets = capcut.carpeta_trabajos() / m.trabajo / "assets"
+    plan = [g for g in plan if (assets / f"{g['id']}.mov").is_file()]
+    extra = max([g["inicio"] + g["duracion"] - datos["duracion_corte"] for g in plan] + [0])
+    actual = "base"
+    if extra > 0:  # la pantalla final dura más que el Corte: congela el último fotograma
+        filtro += f"[base]tpad=stop_mode=clone:stop_duration={extra:.2f}[base2];[aud]apad=pad_dur={extra:.2f}[aud2];"
+        actual, audio = "base2", "aud2"
+    else:
+        audio = "aud"
+    for k, g in enumerate(plan, start=1):
+        entradas += ["-i", str(assets / f"{g['id']}.mov")]
+        fin = g["inicio"] + g["duracion"]
+        filtro += (f"[{k}:v]setpts=PTS+{g['inicio']}/TB[g{k}];"
+                   f"[{actual}][g{k}]overlay=0:0:eof_action=pass:enable='between(t,{g['inicio']},{fin})'[o{k}];")
+        actual = f"o{k}"
+    filtro += f"[{actual}]scale=-2:720[vout]"
     salida = m.carpeta / "corte-previa.mp4"
-    _ffmpeg("-y", "-i", str(m.limpia), "-filter_complex", filtro, "-map", "[v]", "-map", "[a]",
-            "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
-            "-c:a", "aac", "-b:a", "160k", str(salida))
+    _ffmpeg("-y", *entradas, "-filter_complex", filtro, "-map", "[vout]", "-map", f"[{audio}]",
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-c:a", "aac", "-b:a", "160k", str(salida))
     return salida
