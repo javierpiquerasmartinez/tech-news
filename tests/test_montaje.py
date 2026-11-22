@@ -44,10 +44,10 @@ def test_montar_retoma_y_rehace(tmp_path, monkeypatch):
     monkeypatch.setattr(montaje, "preparar_audio", lambda e, s: llamadas.append("preparar") or {"lufs_salida": -14})
     monkeypatch.setattr(montaje, "transcribir", lambda e, s, pista="": llamadas.append("transcribir") or {"palabras": 3})
     semana = date(2026, 11, 13)
-    montaje.montar(semana)
-    montaje.montar(semana)  # ya hecho: no repite
+    montaje.montar(semana, hasta="transcribir")
+    montaje.montar(semana, hasta="transcribir")  # ya hecho: no repite
     assert llamadas == ["preparar", "transcribir"]
-    montaje.montar(semana, rehacer="transcribir")
+    montaje.montar(semana, hasta="transcribir", rehacer="transcribir")
     assert llamadas == ["preparar", "transcribir", "transcribir"]
     with pytest.raises(montaje.MontajeInvalido, match="aún no está construido"):
         montaje.montar(semana, hasta="ensamblar")
@@ -57,7 +57,7 @@ def test_sin_grabacion_dice_donde_dejarla(tmp_path, monkeypatch):
     monkeypatch.setenv("TN_MONTAJES", str(tmp_path))
     (tmp_path / "2026-11-13").mkdir()
     with pytest.raises(montaje.MontajeInvalido, match="grabacion.mp4"):
-        montaje.montar(date(2026, 11, 13))
+        montaje.montar(date(2026, 11, 13), hasta="transcribir")
 
 
 def test_extraer_plantillas_de_un_proyecto(tmp_path, monkeypatch):

@@ -17,7 +17,7 @@ from pathlib import Path
 from tn.db import _iso, ahora
 
 PASOS = ("preparar", "transcribir", "cortar", "graficos", "ensamblar", "revisar")
-IMPLEMENTADOS = ("preparar", "transcribir")
+IMPLEMENTADOS = ("preparar", "transcribir", "cortar")
 EXTENSIONES = (".mp4", ".mov", ".m4v", ".mkv")
 
 # Voz: paso alto, ruido suave fuera, compresión ligera, y −14 LUFS (estándar de YouTube).
@@ -70,6 +70,26 @@ class Montaje:
     def transcripcion(self) -> Path:
         return self.carpeta / "transcripcion.json"
 
+    @property
+    def corte(self) -> Path:
+        return self.carpeta / "corte.json"
+
+    def ajustes_corte(self) -> dict:
+        ruta = self.carpeta / "ajustes-corte.json"
+        return json.loads(ruta.read_text()) if ruta.is_file() else {"quitar": [], "mantener": []}
+
+    def guardar_ajustes_corte(self, quitar: list[int], mantener: list[int]) -> dict:
+        a = self.ajustes_corte()
+        a["quitar"] = sorted((set(a["quitar"]) | set(quitar)) - set(mantener))
+        a["mantener"] = sorted((set(a["mantener"]) | set(mantener)) - set(quitar))
+        (self.carpeta / "ajustes-corte.json").write_text(json.dumps(a, indent=1))
+        return a
+
+    @property
+    def trabajo(self) -> str:
+        """Nombre del trabajo en capcut-kit y del proyecto de CapCut."""
+        return f"jpdev-{self.semana.isoformat()}"
+
     def guion(self) -> str:
         """El guion del Resumen semanal de esa semana (vacío si no hay)."""
         from tn import propuestas
@@ -106,14 +126,15 @@ def _ffmpeg(*args: str) -> subprocess.CompletedProcess:
 def _codec_video(ruta: Path) -> str:
     r = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=codec_name",
                         "-of", "csv=p=0", str(ruta)], capture_output=True, text=True)
-    return r.stdout.strip()
+    # csv puede añadir una coma final (p. ej. "hevc," en los .MOV del iPhone)
+    return r.stdout.strip().split("\n")[0].strip(",").strip()
 
 
 def medir_loudness(ruta: Path, filtro_previo: str = "") -> dict:
     """Primera pasada de loudnorm: mide el audio (LUFS, pico, rango) sin escribir nada."""
     objetivo = f"loudnorm=I={LOUDNORM['I']}:TP={LOUDNORM['TP']}:LRA={LOUDNORM['LRA']}:print_format=json"
     filtro = f"{filtro_previo},{objetivo}" if filtro_previo else objetivo
-    r = _ffmpeg("-i", str(ruta), "-af", filtro, "-f", "null", "-")
+    r = _ffmpeg("-i", str(ruta), "-vn", "-af", filtro, "-f", "null", "-")
     bloque = r.stderr[r.stderr.rindex("{"): r.stderr.rindex("}") + 1]
     return json.loads(bloque)
 
@@ -183,10 +204,43 @@ def transcribir(entrada: Path, salida: Path, idioma: str = "es", modelo: str = M
             "duracion_s": float(palabras[-1]["fin"]) if palabras else 0.0}
 
 
+# --- 3. Cortar ----------------------------------------------------------------------------
+
+
+def cortar(m: "Montaje") -> dict:
+    from tn import capcut, corte
+
+    trans = json.loads(m.transcripcion.read_text())
+    res = corte.cortar(trans, m.guion(), m.ajustes_corte())
+    m.corte.write_text(json.dumps(res, ensure_ascii=False, indent=1))
+    # Transcripción en el tiempo del Corte: los Gráficos se colocan con ella.
+    tramos = [corte.Tramo(t["inicio"], t["fin"], t["unidades"]) for t in res["tramos"]]
+    palabras = []
+    for p in trans["palabras"]:
+        ini = corte.a_tiempo_corte(p["inicio"], tramos)
+        fin = corte.a_tiempo_corte(p["fin"], tramos)
+        if ini is not None and fin is not None:
+            palabras.append({**p, "inicio": ini, "fin": fin})
+    (m.carpeta / "transcripcion-corte.json").write_text(json.dumps({"palabras": palabras}, ensure_ascii=False, indent=1))
+    capcut.preparar_trabajo(m.trabajo, m.limpia, res["tramos"])
+    us = res["unidades"]
+    return {
+        "duracion_grabacion": res["duracion_grabacion"],
+        "duracion_corte": res["duracion_corte"],
+        "unidades": len(us),
+        "otras_tomas": sum(u["decision"] == "otra-toma" for u in us),
+        "errores": sum(u["decision"] == "error" for u in us),
+        "dudosas": sum(u["dudosa_con"] is not None for u in us),
+        "tramos": len(res["tramos"]),
+        "bloques_situados": len(res["bloques"]),
+        "bloques_dudosos": sum(b["dudoso"] for b in res["bloques"]),
+    }
+
+
 # --- Orquestación ------------------------------------------------------------------------
 
 
-def montar(semana: date, hasta: str = "transcribir", rehacer: str | None = None, al_avanzar=None) -> dict:
+def montar(semana: date, hasta: str = "cortar", rehacer: str | None = None, al_avanzar=None) -> dict:
     """Ejecuta los pasos en orden hasta `hasta`; se salta los hechos salvo desde `rehacer`."""
     if hasta not in PASOS:
         raise MontajeInvalido(f"Paso desconocido: {hasta}. Pasos: {', '.join(PASOS)}")
@@ -209,6 +263,24 @@ def montar(semana: date, hasta: str = "transcribir", rehacer: str | None = None,
             guion = m.guion()
             detalle = transcribir(m.limpia, m.transcripcion, pista=vocabulario(guion) if guion else "")
             detalle["con_vocabulario_del_guion"] = bool(guion)
+        elif paso == "cortar":
+            detalle = cortar(m)
         m.marcar(paso, **detalle)
         resultados[paso] = detalle
     return resultados
+
+
+def previa_corte(m: Montaje) -> Path:
+    """MP4 rápido del Corte (sin Gráficos) para escucharlo antes de ir a CapCut."""
+    datos = json.loads(m.corte.read_text())
+    partes, ref = [], []
+    for i, t in enumerate(datos["tramos"]):
+        partes.append(f"[0:v]trim={t['inicio']}:{t['fin']},setpts=PTS-STARTPTS,fps=30,scale=-2:720[v{i}];"
+                      f"[0:a]atrim={t['inicio']}:{t['fin']},asetpts=PTS-STARTPTS[a{i}];")
+        ref.append(f"[v{i}][a{i}]")
+    filtro = "".join(partes) + "".join(ref) + f"concat=n={len(ref)}:v=1:a=1[v][a]"
+    salida = m.carpeta / "corte-previa.mp4"
+    _ffmpeg("-y", "-i", str(m.limpia), "-filter_complex", filtro, "-map", "[v]", "-map", "[a]",
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+            "-c:a", "aac", "-b:a", "160k", str(salida))
+    return salida

@@ -259,6 +259,7 @@ flowchart LR
 - **Iteración:** v1 → tu feedback (con minuto) → v2… Una vez retocado a mano en CapCut, el Montador solo **añade**.
 - **Requisitos:** CapCut instalado en este Mac, `~/git/jpdev/capcut-kit` clonado en el commit fijado (`TN_CAPCUT_KIT` para otra ruta) con sus `capcut-templates/`, ffmpeg y node. Compruébalo con `uv run tn montaje requisitos`; las plantillas se sacan de un proyecto tuyo con un texto: `uv run tn montaje plantillas --desde <proyecto>`. Tras actualizar CapCut: `uv run tn montaje doctor`.
 - **Uso:** `uv run tn montar --semana 2026-11-13 [--hasta <paso>] [--rehacer <paso>]`. Cada paso queda apuntado en `estado.json` de la carpeta del Montaje: relanzar retoma donde se quedó. La transcripción usa los nombres propios del guion como pista para acertar con los términos técnicos.
+- **Revisar el Corte:** `uv run tn montaje corte --semana <fecha>` lista cada frase con su decisión (✓ queda, ↺ otra Toma, ✗ error o quitada, ⚠ dudosa) y dónde cae cada bloque del guion. Se corrige con `--quitar 3,5` o `--mantener 4` (se guarda en `ajustes-corte.json` y se rehace el Corte). `uv run tn montaje previa --semana <fecha>` exporta `corte-previa.mp4` para escucharlo. Lo dudoso se resuelve así, contigo o hablando conmigo, sin gastar cuota en un agente.
 
 ## 10. Hoja de ruta (fase 1)
 
