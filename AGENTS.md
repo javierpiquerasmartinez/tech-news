@@ -7,6 +7,7 @@ How the system works (roles, schedules, commands): `docs/arnes.md`. Every action
 - Python 3.12 with `uv`. Install: `uv sync`. Run: `uv run tn --help`. Tests: `uv run pytest`.
 - Source catalog: `fuentes.yaml` (adding a source needs no code). Data: `data/tech-news.db` (SQLite, gitignored).
 - Tests never hit the network: parsers are tested against fixtures in `tests/fixtures/`.
+- Graphics templates live in `graficos/` (HyperFrames HTML + GSAP, run `npm install` there once); their colors and fonts come from `estilo-edicion.md` via `graficos/comun.css`.
 - The Montador (phase 2) talks to CapCut only through `src/tn/capcut.py`, which shells out to capcut-kit cloned outside the repo (ADR-0005). Never copy capcut-kit code into this repo: it has no license.
 - When running `tn` on the user's behalf from an interactive Claude Code session, pass `--origen claude` to the commands that accept it (`recoger`, `editar`, `explorar`, `diario` and the `historia` corrections). Role skills run headless (`editor`, `explorador`) follow their skill's commands exactly and never add `--origen`.
 

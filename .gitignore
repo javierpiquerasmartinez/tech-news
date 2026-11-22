@@ -11,3 +11,6 @@ data/
 
 # Capa humana (Propuestas): fuera de git mientras el repo sea público (ADR-0003)
 semanas/
+
+# Dependencias de las plantillas de Gráficos
+node_modules/

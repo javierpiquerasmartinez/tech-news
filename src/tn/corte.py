@@ -186,7 +186,7 @@ def bloques_guion(guion: str) -> list[dict]:
         if titulo.lower().startswith(_SIN_BLOQUE):
             continue
         cuerpo = re.sub(r"\*\*(Visual|Fuentes)[^\n]*", "", m.group(2))
-        res.append({"id": len(res), "titulo": re.sub(r"\s*·.*$", "", titulo), "texto": cuerpo})
+        res.append({"id": len(res), "titulo": re.sub(r"\s*·.*$", "", titulo), "texto": cuerpo, "original": m.group(2)})
     return res
 
 
