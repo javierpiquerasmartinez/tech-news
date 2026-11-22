@@ -51,6 +51,53 @@ CREATE TABLE IF NOT EXISTS cursores (
     ultima_ok  TEXT NOT NULL
 );
 
+-- Historias: el acontecimiento deduplicado que agrupa Items (GLOSSARY.md).
+CREATE TABLE IF NOT EXISTS historias (
+    id               INTEGER PRIMARY KEY,
+    titulo           TEXT NOT NULL,
+    resumen          TEXT,
+    area             TEXT,
+    estado           TEXT NOT NULL DEFAULT 'nueva',  -- nueva | destacada | descartada | usada | fusionada
+    motivo_descarte  TEXT,
+    fusionada_en     INTEGER REFERENCES historias(id),
+    continua_a       INTEGER REFERENCES historias(id),  -- seguimiento de una Historia ya cerrada
+    urgencia         INTEGER NOT NULL,
+    just_urgencia    TEXT NOT NULL,
+    valor_didactico  INTEGER NOT NULL,
+    just_didactico   TEXT NOT NULL,
+    peso_semanal     INTEGER NOT NULL,
+    just_peso        TEXT NOT NULL,
+    es_bomba         INTEGER NOT NULL DEFAULT 0,
+    creada_en        TEXT NOT NULL,
+    actualizada_en   TEXT NOT NULL,
+    ultimo_item_en   TEXT NOT NULL,
+    ejecucion_id     INTEGER REFERENCES ejecuciones(id)
+);
+CREATE INDEX IF NOT EXISTS historias_ultimo ON historias(ultimo_item_en);
+
+-- Cada Item pertenece como mucho a una Historia.
+CREATE TABLE IF NOT EXISTS historia_items (
+    historia_id  INTEGER NOT NULL REFERENCES historias(id),
+    item_id      INTEGER NOT NULL UNIQUE REFERENCES items(id),
+    PRIMARY KEY (historia_id, item_id)
+);
+
+-- Items que el Editor ha revisado y no merecen Historia (ruido).
+CREATE TABLE IF NOT EXISTS items_ruido (
+    item_id       INTEGER PRIMARY KEY REFERENCES items(id),
+    ejecucion_id  INTEGER REFERENCES ejecuciones(id)
+);
+
+-- Decisiones de la persona editora sobre Historias: alimentan `tn perfil revisar`.
+CREATE TABLE IF NOT EXISTS decisiones (
+    id           INTEGER PRIMARY KEY,
+    historia_id  INTEGER NOT NULL REFERENCES historias(id),
+    accion       TEXT NOT NULL,   -- descartar | destacar | restaurar | puntuar | fusionar | separar
+    detalle      TEXT,            -- JSON
+    origen       TEXT NOT NULL,
+    momento      TEXT NOT NULL
+);
+
 -- Items que enlazan a la misma URL, aunque vengan de Fuentes distintas.
 CREATE VIEW IF NOT EXISTS grupos_url AS
 SELECT url_normalizada,
@@ -78,7 +125,20 @@ def conectar(ruta: Path) -> sqlite3.Connection:
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute("PRAGMA journal_mode = WAL")
     conn.executescript(ESQUEMA)
+    _migrar(conn)
     return conn
+
+
+def _migrar(conn: sqlite3.Connection) -> None:
+    """Cambios de esquema sobre bases ya creadas."""
+    columnas = {f["name"] for f in conn.execute("PRAGMA table_info(ejecuciones)")}
+    if "uso" not in columnas:
+        # Consumo de un agente (tokens, coste, turnos) como JSON.
+        conn.execute("ALTER TABLE ejecuciones ADD COLUMN uso TEXT")
+    if "resultado" not in columnas:
+        # Resumen final del agente, para leerlo en `tn ejecuciones --id`.
+        conn.execute("ALTER TABLE ejecuciones ADD COLUMN resultado TEXT")
+    conn.commit()
 
 
 def abrir_ejecucion(conn: sqlite3.Connection, comando: str, origen: str, inicio: datetime) -> int:
@@ -90,10 +150,18 @@ def abrir_ejecucion(conn: sqlite3.Connection, comando: str, origen: str, inicio:
     return int(cur.lastrowid)
 
 
-def cerrar_ejecucion(conn: sqlite3.Connection, ejecucion_id: int, estado: str) -> None:
+def cerrar_ejecucion(
+    conn: sqlite3.Connection,
+    ejecucion_id: int,
+    estado: str,
+    *,
+    uso: str | None = None,
+    resultado: str | None = None,
+) -> None:
     conn.execute(
-        "UPDATE ejecuciones SET fin = ?, estado = ? WHERE id = ?",
-        (_iso(ahora()), estado, ejecucion_id),
+        "UPDATE ejecuciones SET fin = ?, estado = ?, uso = COALESCE(?, uso), "
+        "resultado = COALESCE(?, resultado) WHERE id = ?",
+        (_iso(ahora()), estado, uso, resultado, ejecucion_id),
     )
     conn.commit()
 

@@ -167,18 +167,22 @@ Toda acción pasa por la CLI `tn` ([ADR-0004](adr/0004-cli-unica-como-punto-de-e
 | Quiero… | CLI | Hablando con Claude Code | Web local (`tn ui`) |
 |---|---|---|---|
 | Lanzar el día ahora | `tn diario` | `/recoger` o "lanza el día" | Ejecuciones → Lanzar |
-| Solo recoger / solo editar | `tn recoger` · `tn editar` | "recoge" · "re-edita lo de hoy" | Ejecuciones |
-| Ver Historias del día/semana | `tn historias --semana` | "¿qué hay hoy?" | Hoy / Semana |
+| Solo recoger / editar / explorar | `tn recoger` · `tn editar [--max-items N]` · `tn explorar` | "recoge" · "re-edita lo de hoy" | Ejecuciones |
+| Ver Historias del día/semana | `tn historias --dias 1` · `tn historias` (7 días) · `tn historia ver <id>` | "¿qué hay hoy?" | Hoy / Semana |
 | Descartar una Historia | `tn historia descartar <id> --motivo …` | "descarta la de X, ya está muy contada" | Botón Descartar |
 | Destacar una Historia | `tn historia destacar <id>` | "esta tiene que ir sí o sí" | Botón Destacar |
 | Corregir una puntuación | `tn historia puntuar <id> --didactico 8` | "esto da para vídeo didáctico" | Editar puntuación |
-| Fusionar / separar | `tn historia fusionar <a> <b>` · `separar` | "estas dos son la misma" | Fusionar / Separar |
+| Fusionar / separar | `tn historia fusionar <a> <b>` · `tn historia separar <id> --items 3,4 --titulo …` | "estas dos son la misma" | Fusionar / Separar |
 | Propuesta fuera de calendario | `tn propuesta pedir <id> --formato …` | "hazme un post de esto ya" | Pedir Propuesta |
 | Generar el paquete semanal antes | `tn redactar --resumen` | `/redactar` | Ejecuciones |
 | Aprobar / descartar una Propuesta | `tn propuesta estado <fichero> aprobada` | "apruebo el post 2" | Propuestas |
 | Revisar la semana con criterio | — | `/revisar-semana` | — |
 | Afinar el Perfil editorial | `tn perfil revisar` | "esta semana sobraba cripto" | — |
 | Ver qué ha fallado | `tn ejecuciones` | "¿qué tal fue la última ejecución?" | Ejecuciones / Fuentes |
+
+Toda acción acepta `--origen manual|horario|claude|web` para que el registro diga quién la lanzó (`tn` usa `manual` por defecto; yo uso `claude`). Las correcciones sobre Historias (descartar, destacar, restaurar, puntuar, fusionar, separar) quedan guardadas como decisiones, que alimentan `tn perfil revisar`.
+
+Comandos internos de los agentes, útiles para depurar: `tn editor pendientes` (lo que ve el Editor), `tn editor aplicar` (aplica un lote de decisiones, todo o nada) y `tn item anadir` (lo que usa el Explorador).
 
 Reparto: lo **mecánico** (descartar, aprobar, ver estado) en la web, que no gasta cuota. Lo que requiere **criterio** (revisar la semana, afinar un guion, discutir el perfil) conmigo.
 

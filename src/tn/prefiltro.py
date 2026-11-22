@@ -9,7 +9,9 @@ from tn.modelo import ItemRecogido
 from tn.urls import normalizar_url
 
 # Títulos que marcan contenido no editorial (patrocinios, autopromoción).
-_NO_EDITORIAL = re.compile(r"\((sponsor|sponsored|tldr community)\)\s*$", re.IGNORECASE)
+_NO_EDITORIAL = re.compile(
+    r"\((sponsor|sponsored|tldr community|\d+\s+minute\s+form)\)\s*$", re.IGNORECASE
+)
 
 
 @dataclass
