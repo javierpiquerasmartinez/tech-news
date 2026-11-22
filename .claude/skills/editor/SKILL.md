@@ -43,10 +43,13 @@ Los resúmenes de las newsletters bastan para casi todo. Usa WebFetch para leer 
 
 ## Formato del lote
 
-Pásalo como **un único argumento `--lote` entre comillas simples**, en una línea o en varias (heredocs, ficheros y stdin no están permitidos):
+Cada lote se aplica en dos pasos:
 
-```bash
-uv run tn editor aplicar --lote '{
+1. Escribe el JSON con la herramienta **Write** en `data/borradores/lote.json`. Es la única carpeta en la que puedes escribir.
+2. Aplícalo con `uv run tn editor aplicar data/borradores/lote.json`. Si se aplica bien, el fichero se borra solo. Si la CLI lo rechaza, corrige el fichero y repite.
+
+```json
+{
   "nuevas": [
     {"titulo": "PostgreSQL 19 sale con …", "resumen": "2–3 frases en español: qué ha pasado y por qué importa a un dev full stack.",
      "area": "desarrollo", "items": [101, 230],
@@ -59,10 +62,9 @@ uv run tn editor aplicar --lote '{
     {"historia": 12, "items": [305], "urgencia": 7, "just_urgencia": "Se confirma explotación activa"}
   ],
   "ruido": [44, 45, 46]
-}'
+}
 ```
 
-- Dentro del JSON **no uses comilla simple recta** (`'`), porque cerraría el argumento. Si necesitas un apóstrofo, usa `’`.
 - `area`: `ia` | `desarrollo` | `seguridad` | `cloud-devops` | `industria` | `otros`.
 - `titulo` y `resumen` siempre en **español**, aunque los Items estén en inglés. El título nombra el hecho, sin clickbait.
 - En `anadir`, las puntuaciones son opcionales. Si mandas una, mándala con su justificación.

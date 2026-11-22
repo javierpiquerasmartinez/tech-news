@@ -27,6 +27,8 @@ HERRAMIENTAS = {
         "Bash(uv run tn historia ver:*)",
         "Read(perfil-editorial.md)",
         "WebFetch",
+        # Los lotes grandes no pasan como argumento del shell en dontAsk: van en un borrador.
+        "Edit(./data/borradores/**)",
     ],
     "explorador": [
         "Bash(uv run tn item anadir:*)",
