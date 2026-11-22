@@ -1,3 +1,7 @@
 # Dos capas de datos: SQLite fuera de git y Markdown dentro
 
 Items e Historias (alto volumen, consultas, deduplicación) viven en un único fichero SQLite local, excluido de git y respaldado con una copia diaria comprimida. Las Propuestas y el material para la persona editora (pocos ficheros, se leen y editan a mano) viven como Markdown versionado en el repo, organizados por Semana editorial y con un campo `estado` (propuesta | aprobada | descartada | publicada). Se descartó guardar Items como ficheros en git (inflaría el repo con ~100k ficheros al año) y Postgres (servidor innecesario para un solo usuario en local). El catálogo de Fuentes y el Perfil editorial son ficheros editables en el repo, no datos en la base.
+
+## Actualización (2026-11-22)
+
+`semanas/` también queda **fuera de git**: el repo es público y las Propuestas (guiones, posts) no deben verse antes de publicarse. Las Propuestas se respaldan junto con la SQLite en la copia diaria. Si el repo pasa a privado, se puede volver a versionar.
