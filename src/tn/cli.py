@@ -820,14 +820,60 @@ def cmd_montaje_doctor() -> None:
         raise typer.Exit(1)
 
 
+@montaje_app.command("corte")
+def cmd_montaje_corte(
+    semana: Annotated[str, typer.Option(help="Semana editorial del Montaje.")],
+    quitar: Annotated[str, typer.Option(help="Ids de unidades a quitar, separados por comas.")] = "",
+    mantener: Annotated[str, typer.Option(help="Ids de unidades a mantener aunque parezcan otra Toma.")] = "",
+) -> None:
+    """Muestra el Corte frase a frase y permite quitar o forzar unidades concretas."""
+    m = montaje.Montaje(_semana(semana))
+
+    def ids(t: str) -> list[int]:
+        try:
+            return [int(x) for x in t.split(",") if x.strip()]
+        except ValueError:
+            raise typer.BadParameter("los ids van separados por comas: 3,5,8") from None
+
+    if quitar or mantener:
+        m.guardar_ajustes_corte(ids(quitar), ids(mantener))
+        try:
+            montaje.montar(m.semana, hasta="cortar", rehacer="cortar")
+        except montaje.MontajeInvalido as e:
+            _fallar(e)
+    if not m.corte.is_file():
+        _fallar(montaje.MontajeInvalido("Aún no hay Corte: lanza `uv run tn montar --semana …`"))
+    datos = json.loads(m.corte.read_text())
+    marcas = {"queda": "✓", "otra-toma": "↺", "error": "✗", "quitada": "✗"}
+    for u in datos["unidades"]:
+        dudosa = f"  ⚠ se parece a {u['dudosa_con']}" if u["dudosa_con"] is not None and u["decision"] == "queda" else ""
+        motivo = f"  ({u['motivo']})" if u["motivo"] else ""
+        typer.echo(f"{marcas.get(u['decision'], '?')} [{u['id']:>3}] {u['inicio']:7.2f}s  {u['texto']}{motivo}{dudosa}")
+    typer.echo(f"\nCorte: {datos['duracion_corte']:.1f} s de {datos['duracion_grabacion']:.1f} s grabados · "
+               f"{len(datos['tramos'])} tramos")
+    for b in datos["bloques"]:
+        aviso = "  ⚠ no se parece al guion" if b.get("dudoso") else ""
+        typer.echo(f"  {b['inicio']:7.2f}–{b['fin']:7.2f}s  {b['titulo']}{aviso}")
+
+
+@montaje_app.command("previa")
+def cmd_montaje_previa(semana: Annotated[str, typer.Option(help="Semana editorial del Montaje.")]) -> None:
+    """Exporta un MP4 rápido del Corte (sin Gráficos) para escucharlo."""
+    try:
+        ruta = montaje.previa_corte(montaje.Montaje(_semana(semana)))
+    except (montaje.MontajeInvalido, FileNotFoundError) as e:
+        _fallar(e)
+    typer.echo(f"Vista previa del Corte: {ruta}")
+
+
 @app.command("montar")
 def cmd_montar(
     semana: Annotated[str, typer.Option(help="Semana editorial del guion (cualquier día, AAAA-MM-DD).")],
-    hasta: Annotated[str, typer.Option(help=f"Último paso: {' | '.join(montaje.PASOS)}.")] = "transcribir",
+    hasta: Annotated[str, typer.Option(help=f"Último paso: {' | '.join(montaje.PASOS)}.")] = "cortar",
     rehacer: Annotated[str | None, typer.Option(help="Rehacer desde este paso aunque ya esté hecho.")] = None,
     origen: OpcionOrigen = "manual",
 ) -> None:
-    """Montador: de tu Grabación a un Montaje de CapCut (por ahora: preparar y transcribir)."""
+    """Montador: de tu Grabación a un Montaje de CapCut (por ahora: preparar, transcribir y cortar)."""
     _validar_origen(origen)
     inicio = _semana(semana)
     conn = _conn()

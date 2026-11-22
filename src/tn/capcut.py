@@ -101,3 +101,31 @@ def extraer_plantillas(proyecto: str) -> list[Path]:
         ruta.write_text(json.dumps(pieza, ensure_ascii=False, indent=1), encoding="utf-8")
         escritos.append(ruta)
     return escritos
+
+
+def carpeta_trabajos() -> Path:
+    """capcut-kit busca cada trabajo en `<padre del kit>/projects/<trabajo>/`."""
+    return ruta_kit().parent / "projects"
+
+
+def preparar_trabajo(trabajo: str, grabacion: Path, tramos: list[dict], fps: float = 30.0) -> Path:
+    """Deja el Corte donde `capcut-bridge.py replay` lo espera (INPUT-CONTRACT.md del kit).
+
+    La grabación se enlaza (hardlink) en `raw/`: no ocupa espacio extra y sigue dentro del
+    mismo disco que `~/Movies`, que es lo que CapCut puede leer.
+    """
+    carpeta = carpeta_trabajos() / trabajo
+    (carpeta / "transcript").mkdir(parents=True, exist_ok=True)
+    (carpeta / "raw").mkdir(parents=True, exist_ok=True)
+    destino = carpeta / "raw" / grabacion.name
+    if destino.exists():
+        destino.unlink()
+    try:
+        os.link(grabacion, destino)
+    except OSError:
+        shutil.copy2(grabacion, destino)
+    cuts = {"clip": grabacion.name, "fps": fps,
+            "segments": [{"clip": grabacion.name, "start": t["inicio"], "end": t["fin"],
+                          "note": f"unidades {', '.join(map(str, t['unidades']))}"} for t in tramos]}
+    (carpeta / "transcript" / "cuts.json").write_text(json.dumps(cuts, ensure_ascii=False, indent=1))
+    return carpeta
