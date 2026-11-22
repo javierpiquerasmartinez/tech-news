@@ -111,6 +111,7 @@ def test_pantalla_de_propuestas(conn):
     cliente = TestClient(app)
     r = cliente.get("/propuestas")
     assert r.status_code == 200 and "Post NGINX" in r.text
+    assert f'<option value="{p.ruta.parent.name}"' in r.text and '<option value="semanas"' not in r.text
     assert "<script>alert" not in r.text and "<strong>fuerte</strong>" in r.text
     r = cliente.post("/propuesta/estado", data={"f": p.relativa, "estado": "aprobada"})
     assert "aprobada" in r.text
