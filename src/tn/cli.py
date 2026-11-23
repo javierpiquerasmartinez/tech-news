@@ -1000,7 +1000,7 @@ def cmd_montar(
     sin_agente: Annotated[bool, typer.Option("--sin-agente", help="Gráficos: solo cabeceras, sello y final (no gasta cuota).")] = False,
     origen: OpcionOrigen = "manual",
 ) -> None:
-    """Montador: de tu Grabación a un Montaje de CapCut (por ahora hasta los Gráficos)."""
+    """Montador: de tu Grabación a un Montaje de CapCut (preparar → transcribir → cortar → gráficos → ensamblar → revisar)."""
     _validar_origen(origen)
     inicio = _semana(semana)
     conn = _conn()
@@ -1208,7 +1208,7 @@ def cmd_propuesta_estado(
 def cmd_ui(
     puerto: Annotated[int, typer.Option(help="Puerto local.")] = 8765,
 ) -> None:
-    """Interfaz web local para revisar Historias, Fuentes y Ejecuciones (solo en este Mac)."""
+    """Interfaz web local: Historias, Propuestas, Fuentes y Ejecuciones (solo en este Mac)."""
     import uvicorn
 
     typer.echo(f"tech-news en http://127.0.0.1:{puerto}  (Ctrl+C para parar)")
